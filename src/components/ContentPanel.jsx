@@ -30,8 +30,9 @@ const ContentPanel = memo(({ chapter, onCodeClick, darkMode, output, isRunning, 
       rawMarkdown = rawMarkdown
         // Ensure display math blocks have proper newlines
         .replace(/\s*\$\$\s*/g, '\n$$\n')
-        // Remove extra spaces inside inline math delimiters
-        .replace(/\$\s+(.*?)\s+\$/g, '$$$1$')
+        // Remove extra spaces inside inline math delimiters, but assume $$ is display math
+        // Use lookbehind (?<!$) and lookahead (?!$) to ensure we only target single $
+        .replace(/(?<!\$)\$(?!\$)\s*(.*?)\s*(?<!\$)\$(?!\$)/g, '$$$1$')
 
       const rawHtml = marked.parse(rawMarkdown)
 
