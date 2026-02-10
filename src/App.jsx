@@ -161,7 +161,7 @@ function App() {
     const imports = code.match(/^\s*(?:from|import)\s+([a-zA-Z0-9_]+)/gm)
     if (!imports) return
 
-    const stdLibs = ['sys', 'os', 'io', 'time', 'base64', 'json', 'datetime', 'math', 're', 'warnings', 'builtins', 'types']
+    const stdLibs = ['sys', 'os', 'io', 'time', 'base64', 'json', 'datetime', 'math', 're', 'warnings', 'builtins', 'types', 'random', 'csv', 'copy', 'collections', 'itertools', 'functools', 'pathlib']
     const coreLibs = ['numpy', 'pandas', 'matplotlib', 'scipy', 'micropip', 'js', 'builtins', 'QuantLib']
 
     const neededModules = [...new Set(imports.map(line => {
