@@ -715,7 +715,7 @@ ${t}
 import sys
 from io import StringIO
 sys.stdout = StringIO()
-      `),await Kl(e,j),j){const D=document.getElementById("pyodide-plot-container");D&&(D.innerHTML="",window.document.pyodideMplTarget=D)}const ae=M.match(/^\s*(?:from|import)\s+([a-zA-Z0-9_]+)/gm);if(ae){const D=["sys","io","base64","time","math","re","json","datetime","random","os","fractions","decimal","abc","collections","itertools","functools","importlib","timeit"],te=["pymoo","numpy_financial","pandas_datareader","seaborn","openpyxl","setuptools","pyodide_http","QuantLib","quantlib"],W=ae.map(ye=>ye.split(/\s+/).pop()).filter(ye=>![...D,...te].includes(ye));if(W.length>0)try{y(ye=>ye+`正在安裝所需套件: ${W.join(", ")}...
+      `),await Kl(e,j),j){const D=document.getElementById("pyodide-plot-container");D&&(D.innerHTML="",window.document.pyodideMplTarget=D)}const ae=M.match(/^\s*(?:from|import)\s+([a-zA-Z0-9_]+)/gm);if(ae){const D=["sys","io","base64","time","math","re","json","datetime","random","os","fractions","decimal","abc","collections","itertools","functools","importlib","timeit"],te=["pymoo","numpy_financial","pandas_datareader","seaborn","openpyxl","setuptools","pyodide_http","QuantLib","quantlib","numpy","pandas","matplotlib","scipy","statsmodels","sympy","autograd","lxml","micropip"],W=ae.map(ye=>ye.split(/\s+/).pop()).filter(ye=>![...D,...te].includes(ye));if(W.length>0)try{y(ye=>ye+`正在安裝所需套件: ${W.join(", ")}...
 `),await e.runPythonAsync(`
               import micropip
               await micropip.install(${JSON.stringify(W)})
