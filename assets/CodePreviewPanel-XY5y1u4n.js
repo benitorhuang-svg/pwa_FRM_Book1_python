@@ -1,4 +1,4 @@
-import{c as Ve,j as U}from"./index-DxkyelK6.js";import{R as J,r as Xi}from"./monaco-h6ncRSsj.js";import"./vendor-CRB3T2We.js";import"./pyodide-CzPjtFpi.js";/**
+import{c as Ve,j as U}from"./index-DQqfWX-i.js";import{R as J,r as Xi}from"./monaco-h6ncRSsj.js";import"./vendor-CRB3T2We.js";import"./pyodide-CzPjtFpi.js";/**
  * @license lucide-react v0.460.0 - ISC
  *
  * This source code is licensed under the ISC license.
