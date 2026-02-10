@@ -7,8 +7,8 @@ import './ContentPanel.css'
 // Configure KaTeX extension
 const katexOptions = {
   throwOnError: false,
-  displayMode: false,
-  nonStandardPlaceholder: true
+  nonStandardPlaceholder: true,
+  // Let the extension decide displayMode based on $ vs $$ delimiters
 }
 
 marked.use(markedKatex(katexOptions))

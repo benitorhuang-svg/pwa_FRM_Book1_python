@@ -1,4 +1,5 @@
 let pyodideInstance = null
+let initializationPromise = null
 
 export async function loadPyodide(onProgress) {
     if (pyodideInstance) {
@@ -6,51 +7,60 @@ export async function loadPyodide(onProgress) {
         return pyodideInstance
     }
 
-    const updateProgress = (ver, msg) => {
-        if (onProgress) onProgress(ver, msg)
+    if (initializationPromise) {
+        return initializationPromise.then(py => {
+            if (onProgress) onProgress(100, 'Ready')
+            return py
+        })
     }
 
-    try {
-        updateProgress(0, 'Initialize Pyodide (v0.26.4)...')
+    initializationPromise = (async () => {
 
-        // Retry logic for loading Pyodide
-        let pyodide = null;
-        let retries = 3;
-        while (retries > 0) {
-            try {
-                pyodide = await window.loadPyodide({
-                    indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
-                });
-                break;
-            } catch (e) {
-                console.warn(`Failed to load Pyodide (attempts left: ${retries - 1}):`, e);
-                retries--;
-                if (retries === 0) throw e;
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
+        const updateProgress = (ver, msg) => {
+            if (onProgress) onProgress(ver, msg)
         }
 
-        updateProgress(20, 'Loading core packages (numpy, pandas, matplotlib, scipy)...')
+        try {
+            updateProgress(0, 'Initialize Pyodide (v0.26.4)...')
 
-        // Parallel load core packages - Pre-load common ones to avoid execution lag
-        await Promise.all([
-            pyodide.loadPackage('micropip'),
-            pyodide.loadPackage('numpy'),
-            pyodide.loadPackage('pandas'),
-            pyodide.loadPackage('matplotlib'),
-            pyodide.loadPackage('scipy')
-        ])
+            // Retry logic for loading Pyodide
+            let pyodide = null;
+            let retries = 3;
+            while (retries > 0) {
+                try {
+                    pyodide = await window.loadPyodide({
+                        indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
+                    });
+                    break;
+                } catch (e) {
+                    console.warn(`Failed to load Pyodide (attempts left: ${retries - 1}):`, e);
+                    retries--;
+                    if (retries === 0) throw e;
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+
+            updateProgress(20, 'Loading core packages...')
+
+            // Sequential load for cleaner logs and more stable dependency tracking
+            const corePackages = ['micropip', 'numpy', 'pandas', 'matplotlib', 'scipy'];
+            for (let i = 0; i < corePackages.length; i++) {
+                const pkg = corePackages[i];
+                const progress = 25 + (i * 10); // 25, 35, 45, 55, 65
+                updateProgress(progress, `Loading ${pkg}...`);
+                await pyodide.loadPackage(pkg);
+            }
 
 
-        // DEFERRED: Packages moved to on-demand loading in App.jsx
-        updateProgress(70, 'Initializing core environment...')
+            // DEFERRED: Packages moved to on-demand loading in App.jsx
+            updateProgress(70, 'Initializing core environment...')
 
-        // Wait for micropip to be fully ready
-        await pyodide.loadPackage('micropip');
+            // Wait for micropip to be fully ready
+            await pyodide.loadPackage('micropip');
 
-        updateProgress(75, 'Configuring environment...')
-        // 設定 matplotlib 使用 AGG backend (不需要 GUI)
-        await pyodide.runPythonAsync(`
+            updateProgress(75, 'Configuring environment...')
+            // 設定 matplotlib 使用 AGG backend (不需要 GUI)
+            await pyodide.runPythonAsync(`
 import warnings
 # 忽略 DeprecationWarning 和 FutureWarning，保持 Console 乾淨
 warnings.simplefilter("ignore", DeprecationWarning)
@@ -465,8 +475,8 @@ except Exception as e:
     print(f"⚠️ 模擬數據引擎啟動失敗: {str(e)}")
     `)
 
-        // 直接在 Python 層面覆蓋 input 函數，這是最穩健的方法
-        await pyodide.runPythonAsync(`
+            // 直接在 Python 層面覆蓋 input 函數，這是最穩健的方法
+            await pyodide.runPythonAsync(`
 import builtins
 import js
 
@@ -481,13 +491,18 @@ builtins.input = custom_input
 print("✅ Python input() function hooked to window.prompt")
         `);
 
-        pyodideInstance = pyodide
-        updateProgress(100, 'Ready!')
-        return pyodide
-    } catch (error) {
-        console.error('Failed to load Pyodide:', error)
-        throw error
-    }
+            pyodideInstance = pyodide
+            initializationPromise = null // Clear once settled
+            updateProgress(100, 'Ready!')
+            return pyodide
+        } catch (error) {
+            initializationPromise = null // Clear on error to allow retry
+            console.error('Failed to load Pyodide:', error)
+            throw error
+        }
+    })();
+
+    return initializationPromise;
 }
 
 export function getPyodide() {

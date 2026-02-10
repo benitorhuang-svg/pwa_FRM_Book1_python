@@ -51,7 +51,7 @@ export class PerformanceMonitor {
   log(label, duration) {
     const emoji = duration < 100 ? '⚡' : duration < 1000 ? '⏱️' : '🐌'
     const color = duration < 100 ? 'color: green' : duration < 1000 ? 'color: orange' : 'color: red'
-    
+
     console.log(
       `%c${emoji} ${label}: ${duration.toFixed(2)}ms`,
       color
@@ -149,7 +149,7 @@ export class PerformanceMonitor {
    */
   report() {
     const stats = this.getStats()
-    
+
     console.group('📊 效能報告')
     console.log(`總計測量: ${stats.count} 次`)
     console.log(`總時間: ${stats.total.toFixed(2)}ms`)
@@ -191,10 +191,15 @@ export function measureRender(componentName) {
   }
 }
 
+let isVitalsReporting = false
+
 /**
  * Web Vitals 監控
  */
 export function reportWebVitals() {
+  if (isVitalsReporting) return
+  isVitalsReporting = true
+
   if ('PerformanceObserver' in window) {
     // Largest Contentful Paint (LCP)
     const lcpObserver = new PerformanceObserver((list) => {

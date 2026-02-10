@@ -90,6 +90,10 @@ function App() {
       setLoadingProgress(progress)
       setLoadingMessage(message)
     }).then(py => {
+      console.log('🚀 App initialized at:', new Date().toISOString())
+      console.log('📍 Current URL:', window.location.href)
+      console.log('📦 Base URL:', import.meta.env.BASE_URL)
+
       setPyodide(py)
       setLoading(false)
       perfMonitor.end('pyodide-init')
