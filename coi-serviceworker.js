@@ -59,44 +59,83 @@ if (typeof window === 'undefined') {
     });
 } else {
     (function () {
-        // You can customize the name of the service worker script here
-        const scriptName = 'coi-serviceworker.js';
+        // Determine the correct script path based on environment
+        const getScriptPath = () => {
+            const path = window.location.pathname;
+            const base = '/pwa_FRM_Book1_python/';
+            
+            // If we're in the GitHub Pages subdirectory
+            if (path.startsWith(base)) {
+                return base + 'coi-serviceworker.js';
+            }
+            // For local development
+            return '/coi-serviceworker.js';
+        };
 
-        // This is the reload logic
+        const scriptName = getScriptPath();
         const n = navigator;
-        if (n.serviceWorker && n.serviceWorker.controller) {
+
+        // Check if we're already cross-origin isolated
+        if (window.crossOriginIsolated) {
+            console.log("✅ Cross-Origin Isolation is active");
+            return;
+        }
+
+        console.log("⚠️ Cross-Origin Isolation not active, registering Service Worker...");
+
+        // Check if service worker is supported
+        if (!n.serviceWorker) {
+            console.error("❌ Service Workers are not supported in this browser");
+            return;
+        }
+
+        // If we have a controller, send message
+        if (n.serviceWorker.controller) {
             n.serviceWorker.controller.postMessage({
                 type: "coep",
                 value: coepCredentialless
             });
-        } else {
-            // Register the service worker
-            if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-                // Only register if not localhost (Vite dev server handles headers usually)
-                // But for consistency we can also register it. 
-                // Let's rely on the simple check: if !crossOriginIsolated then we need it.
-            }
-
-            if (!window.crossOriginIsolated) {
-                const reloadedBySelf = window.sessionStorage.getItem("coiReloadedBySelf");
-                window.sessionStorage.removeItem("coiReloadedBySelf");
-
-                if (reloadedBySelf) {
-                    console.log("COOP/COEP Service Worker failed to register or activate.");
-                    return;
-                }
-
-                n.serviceWorker.register(scriptName).then(
-                    (registration) => {
-                        console.log("COOP/COEP Service Worker registered");
-                        window.sessionStorage.setItem("coiReloadedBySelf", "true");
-                        window.location.reload();
-                    },
-                    (err) => {
-                        console.error("COOP/COEP Service Worker registration failed: ", err);
-                    }
-                );
-            }
+            return;
         }
+
+        // Prevent infinite reload loop
+        const reloadedBySelf = window.sessionStorage.getItem("coiReloadedBySelf");
+        
+        if (reloadedBySelf) {
+            window.sessionStorage.removeItem("coiReloadedBySelf");
+            console.error("❌ COOP/COEP Service Worker failed to activate after reload");
+            console.log("Please check:");
+            console.log("1. Service Worker scope is correct");
+            console.log("2. No conflicting Service Workers are registered");
+            console.log("3. Browser supports SharedArrayBuffer");
+            return;
+        }
+
+        // Register the service worker
+        n.serviceWorker.register(scriptName, { scope: window.location.pathname.startsWith('/pwa_FRM_Book1_python/') ? '/pwa_FRM_Book1_python/' : '/' })
+            .then((registration) => {
+                console.log("✅ COOP/COEP Service Worker registered successfully");
+                console.log("🔄 Reloading page to activate cross-origin isolation...");
+                
+                // Wait for the service worker to be active
+                if (registration.active) {
+                    window.sessionStorage.setItem("coiReloadedBySelf", "true");
+                    window.location.reload();
+                } else {
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'activated') {
+                                window.sessionStorage.setItem("coiReloadedBySelf", "true");
+                                window.location.reload();
+                            }
+                        });
+                    });
+                }
+            })
+            .catch((err) => {
+                console.error("❌ COOP/COEP Service Worker registration failed:", err);
+                console.log("This may prevent Pyodide from working correctly");
+            });
     })();
 }
