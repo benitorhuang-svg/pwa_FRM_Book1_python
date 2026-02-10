@@ -13,8 +13,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['icons/*.png', 'coi-serviceworker.js'],
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+      includeAssets: ['icons/*.png'],
       manifest: {
         name: 'pwa_基礎篇_手術刀般精準的FRM用Python科學管控財金風險',
         short_name: 'FRM_Python_基礎篇',

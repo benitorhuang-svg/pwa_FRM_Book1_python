@@ -69,7 +69,8 @@
   - **效果**: 消除使用者執行第一個範例時的「冷啟動」延遲，提供即時運算體驗。
 - **三層依賴檢查機制 (Triple-Layer Dependency Guard)**:
 
-  1. **硬排除 (Hard Exclusion)**: `stdLibs` 列表（如 `time`, `os`, `sys`）直接跳過 `micropip` 階段。這些是編譯於 Python Wasm 核心中的內建模組，聯網安裝會導致 `ValueError`。
+  1. **硬排除 (Hard- **標準庫排除清單**: 在 `ensureDependencies` 中明確排除 `time`, `random`, `csv`, `copy`, `os`, `sys` 等內建標準庫，防止 `micropip` 誤抓取導致的 `ValueError`。
+這些是編譯於 Python Wasm 核心中的內建模組，聯網安裝會導致 `ValueError`。
   2. **核心緩存 (Core Cache)**: `coreLibs`（如 `pandas`, `scipy`）在初始化時已載入，直接標記為已安裝。
   3. **動態緩存 (Dynamic Cache)**: 使用 `installedPackages` (Set) 紀錄運行期間動態下載的套件。每次執行前會掃描 `import` 語句，僅對「非標準庫、非核心庫、且尚未安裝」的套件調用聯網下載，極大化執行效率。
 
