@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/pwa_FRM_Book1_python/sw.js', { scope: '/pwa_FRM_Book1_python/' })})}
