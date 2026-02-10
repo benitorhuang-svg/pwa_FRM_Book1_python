@@ -7,6 +7,36 @@ import PythonRunner from './components/PythonRunner'
 import { Book, Moon, Sun } from 'lucide-react'
 import { loadPyodide, cleanupPyodide, runPythonWithTimeout } from './utils/pyodide-loader'
 import { captureAllPlots, initMatplotlib, ensurePlotsShown } from './utils/matplotlib-handler.js'
+
+// Module to package/wheel mapping for lazy loading
+const MODULE_MAPPING = {
+  // Common scientific packages (Pyodide built-ins)
+  'pandas': 'pandas',
+  'matplotlib': 'matplotlib',
+  'scipy': 'scipy',
+  'statsmodels': 'statsmodels',
+  'sympy': 'sympy',
+  'autograd': 'autograd',
+  'lxml': 'lxml',
+  'openpyxl': 'openpyxl',
+  'requests': 'requests',
+  'numpy_financial': 'wheels/numpy_financial-1.0.0-py3-none-any.whl',
+  'seaborn': 'wheels/seaborn-0.13.2-py3-none-any.whl',
+  'pymoo': 'wheels/pymoo-0.4.1-py3-none-any.whl',
+  'pandas_datareader': 'wheels/pandas_datareader-0.10.0-py3-none-any.whl',
+  'pyodide_http': 'wheels/pyodide_http-0.2.2-py3-none-any.whl',
+  'mpl_toolkits': 'matplotlib', // mpl_toolkits is part of matplotlib
+  'pylab': 'matplotlib' // pylab is part of matplotlib
+}
+
+// Dependencies for local wheels
+const MODULE_DEPS = {
+  'requests': ['certifi', 'charset_normalizer', 'idna', 'urllib3'],
+  'certifi': 'wheels/certifi-2026.1.4-py3-none-any.whl',
+  'charset_normalizer': 'wheels/charset_normalizer-3.4.4-py3-none-any.whl',
+  'idna': 'wheels/idna-3.11-py3-none-any.whl',
+  'urllib3': 'wheels/urllib3-2.6.3-py3-none-any.whl'
+}
 import { formatPythonError } from './utils/error-handler'
 import { perfMonitor, reportWebVitals } from './utils/performance'
 import './App.css'
@@ -33,6 +63,8 @@ function App() {
   })
 
   const [previewPanelWidth, setPreviewPanelWidth] = useState(500)
+  const [installedPackages] = useState(new Set())
+  const [currentMplBackend, setCurrentMplBackend] = useState(null)
 
   // Fetch Chapters
   useEffect(() => {
@@ -60,7 +92,6 @@ function App() {
     }).then(py => {
       setPyodide(py)
       setLoading(false)
-      initMatplotlib(py)
       perfMonitor.end('pyodide-init')
     })
 
@@ -125,6 +156,83 @@ function App() {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
+  const ensureDependencies = async (code, isSilent = false) => {
+    if (!pyodide) return
+    const imports = code.match(/^\s*(?:from|import)\s+([a-zA-Z0-9_]+)/gm)
+    if (!imports) return
+
+    const stdLibs = ['sys', 'os', 'io', 'time', 'base64', 'json', 'datetime', 'math', 're', 'warnings', 'builtins', 'types']
+    const coreLibs = ['numpy', 'pandas', 'matplotlib', 'scipy', 'micropip', 'js', 'builtins', 'QuantLib']
+
+    const neededModules = [...new Set(imports.map(line => {
+      const parts = line.trim().split(/\s+/)
+      return parts[0] === 'from' ? parts[1].split('.')[0] : parts[1].split('.')[0]
+    }))].filter(mod => !stdLibs.includes(mod) && !coreLibs.includes(mod))
+      .filter(mod => !installedPackages.has(mod))
+
+    if (neededModules.length === 0) return
+
+    const toInstall = []
+    const wheelsBase = new URL(import.meta.env.BASE_URL || '/', window.location.origin).href
+
+    neededModules.forEach(mod => {
+      const target = MODULE_MAPPING[mod]
+      if (target) {
+        toInstall.push(target.endsWith('.whl') ? wheelsBase + target : target)
+        const deps = MODULE_DEPS[mod] || []
+        deps.forEach(dep => {
+          const depTarget = MODULE_DEPS[dep] || dep
+          toInstall.push(depTarget.endsWith('.whl') ? wheelsBase + depTarget : depTarget)
+        })
+      } else {
+        toInstall.push(mod)
+      }
+    })
+
+    if (toInstall.length > 0) {
+      try {
+        const uniqueInstall = [...new Set(toInstall)]
+        if (!isSilent) {
+          setOutput(prev => prev + `正在動態載入所需套件 [${neededModules.join(', ')}]...\n`)
+        }
+
+        await pyodide.loadPackage('micropip')
+        await pyodide.runPythonAsync(`
+import micropip
+await micropip.install(${JSON.stringify(uniqueInstall)}, keep_going=True)
+        `)
+
+        if (neededModules.includes('matplotlib')) {
+          await initMatplotlib(pyodide)
+          if (!currentMplBackend) setCurrentMplBackend('AGG')
+        }
+
+        neededModules.forEach(mod => {
+          // Mark both the requested module and its mapped package as installed
+          installedPackages.add(mod)
+          const mappedPackage = MODULE_MAPPING[mod]
+          if (mappedPackage && !mappedPackage.endsWith('.whl')) {
+            installedPackages.add(mappedPackage)
+          }
+        })
+        if (!isSilent) {
+          setOutput(prev => prev + `✅ 套件載入完成。\n`)
+        }
+      } catch (e) {
+        console.warn('Dependency loading failed:', e)
+        if (!isSilent) {
+          const errorMsg = e.message || String(e)
+          if (errorMsg.includes("Can't find a pure Python 3 wheel")) {
+            const packageName = errorMsg.match(/for: '([^']+)'/)?.[1] || 'unknown'
+            setOutput(prev => prev + `⚠️ 套件 "${packageName}" 無法載入（可能不支援瀏覽器環境），嘗試繼續執行...\n`)
+          } else {
+            setOutput(prev => prev + `⚠️ 套件載入出現問題，嘗試直接執行...\n`)
+          }
+        }
+      }
+    }
+  }
+
   const handleRunCode = async (code) => {
     if (!pyodide || isRunning || !code) return
 
@@ -140,13 +248,19 @@ function App() {
       const interactive = code.includes('matplotlib.widgets') || code.includes('Slider') || code.includes('Button')
       setIsInteractive(interactive)
 
+      // Optimize: Only re-init Matplotlib if backend changed or it's the first time
+      const targetBackend = interactive ? 'module://matplotlib_pyodide.wasm_backend' : 'AGG'
+      if (currentMplBackend !== targetBackend) {
+        // Initial AGG init is already done in pyodide-loader.js, but we ensure it here if backend changes
+        await initMatplotlib(pyodide, interactive)
+        setCurrentMplBackend(targetBackend)
+      }
+
       await pyodide.runPythonAsync(`
 import sys
 from io import StringIO
 sys.stdout = StringIO()
       `)
-
-      await initMatplotlib(pyodide, interactive)
 
       if (interactive) {
         const target = document.getElementById('pyodide-plot-container')
@@ -156,33 +270,8 @@ sys.stdout = StringIO()
         }
       }
 
-      const imports = code.match(/^\s*(?:from|import)\s+([a-zA-Z0-9_]+)/gm)
-      if (imports) {
-        const stdLibs = [
-          'sys', 'io', 'base64', 'time', 'math', 're', 'json', 'datetime', 'random', 'os',
-          'fractions', 'decimal', 'abc', 'collections', 'itertools', 'functools', 'importlib',
-          'timeit'
-        ]
-        const scientific = [
-          'pymoo', 'numpy_financial', 'pandas_datareader', 'seaborn', 'openpyxl', 'setuptools', 'pyodide_http',
-          'QuantLib', 'quantlib', 'numpy', 'pandas', 'matplotlib', 'scipy', 'statsmodels', 'sympy', 'autograd', 'lxml', 'micropip'
-        ]
-        const packages = imports.map(line => line.split(/\s+/).pop())
-          .filter(pkg => ![...stdLibs, ...scientific].includes(pkg))
-
-        if (packages.length > 0) {
-          try {
-            setOutput(prev => prev + `正在安裝所需套件: ${packages.join(', ')}...\n`)
-            await pyodide.runPythonAsync(`
-              import micropip
-              await micropip.install(${JSON.stringify(packages)})
-            `)
-          } catch (e) {
-            console.warn('Package installation failed:', e)
-            setOutput(prev => prev + `⚠️ 部分套件安裝失敗，嘗試直接執行...\n`)
-          }
-        }
-      }
+      // 1. Detect and load missing dependencies
+      await ensureDependencies(code)
 
       try {
         // Robustness: Use timeout wrapper
@@ -197,7 +286,7 @@ sys.stdout = StringIO()
       }
 
       const stdout = await pyodide.runPythonAsync('sys.stdout.getvalue()')
-      setOutput(stdout || '執行完成（無輸出）')
+      setOutput(stdout || '執行完成（無文字內容輸出 ）')
 
       if (isInteractive) {
         await ensurePlotsShown(pyodide)
@@ -221,6 +310,12 @@ sys.stdout = StringIO()
     setCurrentScript(null)
     setOutput('')
     setPlotImages([])
+
+    // Predictive Load: Scan all examples in the chapter for dependencies and trigger background load
+    if (chapter && chapter.examples && pyodide) {
+      const allCode = chapter.examples.map(ex => ex.code).join('\n')
+      ensureDependencies(allCode, true) // Silent background load
+    }
   }
 
   const handleCodeClick = (script) => {
@@ -268,7 +363,7 @@ sys.stdout = StringIO()
         <div className="top-bar">
           <div className="top-bar-left">
             <Book size={20} className="logo-icon" />
-            <span className="app-title">FRM Python</span>
+            <span className="app-title">FRM_Book1 (基礎篇)</span>
           </div>
 
           <TopNav
@@ -300,6 +395,10 @@ sys.stdout = StringIO()
               output={output}
               isRunning={isRunning}
               plotImages={plotImages}
+              onClearOutput={() => {
+                setOutput('')
+                setPlotImages([])
+              }}
             />
           </div>
 

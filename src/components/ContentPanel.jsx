@@ -1,83 +1,77 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, memo } from 'react'
 import { marked } from 'marked'
+import markedKatex from 'marked-katex-extension'
 import DOMPurify from 'dompurify'
 import './ContentPanel.css'
 
-function ContentPanel({ chapter, onCodeClick, darkMode, output, isRunning, plotImages }) {
-  const [content, setContent] = useState('')
+// Configure KaTeX extension
+const katexOptions = {
+  throwOnError: false,
+  displayMode: false,
+  nonStandardPlaceholder: true
+}
 
-  useEffect(() => {
-    if (chapter) {
-      // 如果有 content.intro，使用它
-      if (chapter.content?.intro) {
-        // 1. 移除 "應用場景清單" 區塊
-        // 匹配從 "## 💻 應用場景清單" 開始，直到下一個 "##" 標題或文件結束
-        let rawMarkdown = chapter.content.intro.replace(
-          /##\s*💻\s*應用場景清單[\s\S]*?(?=##|$)/g,
-          ''
+marked.use(markedKatex(katexOptions))
+
+const ContentPanel = memo(({ chapter, onCodeClick, darkMode, output, isRunning, plotImages, onClearOutput }) => {
+  // Use useMemo to prevent expensive markdown parsing on every re-render (like when resizing)
+  const renderedContent = useMemo(() => {
+    if (!chapter) return null
+
+    if (chapter.content?.intro) {
+      let rawMarkdown = chapter.content.intro.replace(
+        /##\s*💻\s*應用場景清單[\s\S]*?(?=##|$)/g,
+        ''
+      )
+
+      const rawHtml = marked.parse(rawMarkdown)
+
+      const cleanHtml = DOMPurify.sanitize(rawHtml, {
+        ADD_TAGS: ['math', 'annotation', 'semantics', 'mrow', 'msub', 'msup', 'msubsup', 'mover', 'munder', 'munderover', 'mmultiscripts', 'mprec', 'mnext', 'mtable', 'mtr', 'mtd', 'mfrac', 'msqrt', 'mroot', 'mstyle', 'merror', 'mpadded', 'mphantom', 'mfenced', 'menclose', 'ms', 'mglyph', 'maligngroup', 'malignmark', 'maction', 'svg', 'path', 'use', 'span'],
+        ADD_ATTR: ['target', 'xlink:href', 'class', 'style', 'aria-hidden', 'viewBox', 'd', 'fill', 'stroke', 'stroke-width']
+      })
+
+      let processedHtml = cleanHtml
+      const scripts = chapter.examples || []
+      const sortedScripts = [...scripts].sort((a, b) => b.filename.length - a.filename.length)
+
+      sortedScripts.forEach((script) => {
+        const escapedName = script.filename.replace('.', '\\.')
+        const regex = new RegExp(`(?<!['\"\\w\\.])(${escapedName})(?!['\"\\w\\.])`, 'g')
+
+        processedHtml = processedHtml.replace(
+          regex,
+          `<span class="code-link" data-filename="${script.filename}">${script.filename}</span>`
         )
+      })
 
-        const rawHtml = marked.parse(rawMarkdown)
-        const cleanHtml = DOMPurify.sanitize(rawHtml)
+      return processedHtml
+    } else {
+      const examples = chapter.examples || []
+      let html = `
+        <div class="chapter-intro">
+          <h2>${chapter.title}</h2>
+          <p>本章包含 ${examples.length} 個程式範例</p>
+          <div class="example-grid">
+      `
 
-        let processedHtml = cleanHtml
-
-        // 2. 使用 chapter.examples 來生成代碼連結
-        const scripts = chapter.examples || []
-
-        // 先按長度排序，避免部分匹配（雖然後綴.py應該能避免）
-        const sortedScripts = [...scripts].sort((a, b) => b.filename.length - a.filename.length)
-
-        sortedScripts.forEach((script, index) => {
-          // 轉義特殊字符用於正則
-          const escapedName = script.filename.replace('.', '\\.')
-          // 匹配完整單詞
-          const regex = new RegExp(`(?<!['\"\\w\\.])(${escapedName})(?!['\"\\w\\.])`, 'g')
-
-          processedHtml = processedHtml.replace(
-            regex,
-            `<span class="code-link" data-filename="${script.filename}">${script.filename}</span>`
-          )
-        })
-
-        setContent(processedHtml)
-      }
-      // 否則，生成簡單的章節介紹
-      else {
-        const examples = chapter.examples || []
-        let html = `
-          <div class="chapter-intro">
-            <h2>${chapter.title}</h2>
-            <p>本章包含 ${examples.length} 個程式範例</p>
-            <div class="example-grid">
-        `
-
-        examples.forEach((example, index) => {
-          html += `
-            <div class="example-card">
-              <div class="example-number">${index + 1}</div>
-              <div class="example-info">
-                <h3>${example.title}</h3>
-                <span class="code-link" data-filename="${example.filename}">${example.filename}</span>
-              </div>
-            </div>
-          `
-        })
-
+      examples.forEach((example, index) => {
         html += `
+          <div class="example-card">
+            <div class="example-number">${index + 1}</div>
+            <div class="example-info">
+              <h3>${example.title}</h3>
+              <span class="code-link" data-filename="${example.filename}">${example.filename}</span>
             </div>
           </div>
         `
+      })
 
-        setContent(html)
-      }
-    } else {
-      setContent(`
-        <div class="welcome-screen">
-          <h2>👈 請從上方選擇章節開始學習</h2>
-          <p>選擇章節後，可以查看內容並執行程式碼</p>
+      html += `
+          </div>
         </div>
-      `)
+      `
+      return html
     }
   }, [chapter])
 
@@ -87,15 +81,10 @@ function ContentPanel({ chapter, onCodeClick, darkMode, output, isRunning, plotI
         const filename = e.target.dataset.filename
         let script = null
 
-        // 從 examples 中獲取腳本
         if (chapter?.examples) {
           script = chapter.examples.find(s => s.filename === filename)
-
-          if (script) {
-            // 確保 metadata 存在
-            if (!script.metadata) {
-              script.metadata = { description: script.title }
-            }
+          if (script && !script.metadata) {
+            script.metadata = { description: script.title }
           }
         }
 
@@ -109,26 +98,33 @@ function ContentPanel({ chapter, onCodeClick, darkMode, output, isRunning, plotI
     return () => document.removeEventListener('click', handleCodeLinkClick)
   }, [chapter, onCodeClick])
 
-  // Auto-scroll to output when it updates
+  // Auto-scroll to top when chapter changes
   useEffect(() => {
-    if (output || (plotImages && plotImages.length > 0)) {
+    const scrollContainer = document.querySelector('.content-scroll')
+    if (scrollContainer) {
+      scrollContainer.scrollTop = 0
+    }
+  }, [chapter])
+
+  // Auto-scroll to top when output result appears
+  useEffect(() => {
+    if (output || (plotImages && plotImages.length > 0) || isRunning) {
       const scrollContainer = document.querySelector('.content-scroll')
-      const outputElement = document.getElementById('execution-output')
-      if (scrollContainer && outputElement) {
-        // Smooth scroll to the output section
-        outputElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      if (scrollContainer) {
+        // Use scrollTo for smooth or instant reset
+        scrollContainer.scrollTo({ top: 0, behavior: 'instant' })
       }
     }
-  }, [output, plotImages])
+  }, [output, plotImages, isRunning])
 
   return (
     <div className="content-panel">
       <div className="content-scroll">
-        {/* Exclusive View: Show Output OR Markdown Content */}
+        {/* We keep Markdown content ALWAYS rendered if it exists, 
+            but hide it when output is shown to maintain scroll position if needed,
+            OR just exclusive view as before but now memoized. */}
         {(output || (plotImages && plotImages.length > 0) || isRunning) ? (
           <div id="execution-output" className="execution-output-section">
-            <h3 className="output-title">執行結果</h3>
-
             {isRunning && (
               <div className="running-indicator">
                 <div className="spinner"></div>
@@ -151,14 +147,21 @@ function ContentPanel({ chapter, onCodeClick, darkMode, output, isRunning, plotI
             )}
           </div>
         ) : (
-          <div
-            className="markdown-body"
-            dangerouslySetInnerHTML={{ __html: content }}
-          />
+          renderedContent ? (
+            <div
+              className="markdown-body"
+              dangerouslySetInnerHTML={{ __html: renderedContent }}
+            />
+          ) : (
+            <div className="welcome-screen">
+              <h2>👈 請從上方選擇章節開始學習</h2>
+              <p>選擇章節後，可以查看內容並執行程式碼</p>
+            </div>
+          )
         )}
       </div>
     </div>
   )
-}
+})
 
 export default ContentPanel

@@ -1,22 +1,70 @@
 .resizer {
-  width: 6px;
+  width: 16px;
+  /* Increased hit area slightly */
   cursor: col-resize;
   background: transparent;
-  transition: background 0.2s;
+  transition: background-color 0.2s;
   position: relative;
   z-index: 50;
   flex-shrink: 0;
-  margin: 0 -3px;
+  margin: 0 -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.resizer-handle {
+  width: 20px;
+  height: 20px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--accent-color);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-color);
+  opacity: 0;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+}
+
+.resizer:hover .resizer-handle,
+.resizer.dragging .resizer-handle {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  background: var(--accent-color);
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.resizer:hover::before,
+.resizer.dragging::before {
+  opacity: 0.5;
+}
+
+.resizer.dragging::before {
+  opacity: 1;
 }
 
 .resizer:hover,
 .resizer.dragging {
-  background: var(--accent-color, #38bdf8);
+  background: hsla(200, 95%, 50%, 0.08);
 }
 
 .code-preview-panel {
-  background: var(--preview-bg, #1e293b);
-  border-left: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+  background: var(--preview-bg);
+  border-left: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -26,13 +74,13 @@
 }
 
 .app.dark .code-preview-panel {
-  background: #1e293b;
-  border-left-color: #334155;
+  background: var(--preview-bg);
+  border-left-color: var(--glass-border);
 }
 
 .app:not(.dark) .code-preview-panel {
   background: #ffffff;
-  border-left-color: #e2e8f0;
+  border-left-color: var(--glass-border);
 }
 
 .preview-header {
@@ -105,6 +153,18 @@
   background: var(--bg-color, #0f172a);
 }
 
+/* Resizer Overlay to prevent cursor lost in iframe/monaco */
+.resizer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  cursor: col-resize;
+  background: transparent;
+}
+
 .code-section {
   flex: 1;
   display: flex;
@@ -123,29 +183,27 @@
 
 .code-header,
 .output-header {
-  padding: 0.75rem 1rem;
-  background: var(--glass-highlight, rgba(255, 255, 255, 0.05));
-  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+  padding: 0.75rem 1.25rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--glass-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-main, #f1f5f9);
+  color: var(--text-main);
 }
 
 .app.dark .code-header,
 .app.dark .output-header {
-  background: #334155;
-  border-bottom-color: #475569;
-  color: #cbd5e1;
+  background: var(--bg-secondary);
+  border-bottom-color: var(--glass-border);
 }
 
 .app:not(.dark) .code-header,
 .app:not(.dark) .output-header {
-  background: #f1f5f9;
-  border-bottom-color: #e2e8f0;
-  color: #475569;
+  background: var(--bg-secondary);
+  border-bottom-color: var(--glass-border);
 }
 
 .code-display {
@@ -318,9 +376,15 @@
   transition: all 0.2s;
 }
 
-.copy-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: var(--glass-border);
+.btn-secondary {
+  background: var(--accent-light);
+  color: var(--accent-color);
+  border: 1.5px solid var(--accent-color);
+}
+
+.btn-secondary:hover {
+  background: var(--accent-color);
+  color: white;
 }
 
 .divider-vertical {
@@ -328,4 +392,44 @@
   height: 16px;
   background: var(--glass-border);
   margin: 0 0.5rem;
+}
+
+/* Local Toast Positioning */
+.header-right {
+  position: relative;
+}
+
+.local-toast {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 60px;
+  /* Shift left to be under Copy/Execute buttons */
+  background: rgba(15, 23, 42, 0.95);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  animation: toastPop 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.local-toast.toast-success {
+  border-left: 4px solid var(--success-color);
+}
+
+@keyframes toastPop {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

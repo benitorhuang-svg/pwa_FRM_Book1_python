@@ -30,51 +30,23 @@ export async function loadPyodide(onProgress) {
             }
         }
 
-        updateProgress(20, 'Loading core packages (numpy, pandas, matplotlib...)...')
+        updateProgress(20, 'Loading core packages (numpy, pandas, matplotlib, scipy)...')
 
-        // Parallel load core packages
+        // Parallel load core packages - Pre-load common ones to avoid execution lag
         await Promise.all([
             pyodide.loadPackage('micropip'),
             pyodide.loadPackage('numpy'),
-            pyodide.loadPackage('matplotlib'),
             pyodide.loadPackage('pandas'),
-            pyodide.loadPackage('scipy'),
-            pyodide.loadPackage('statsmodels'),
-            pyodide.loadPackage('sympy'),
-            pyodide.loadPackage('autograd'),
-            // lxml needs to be loaded from CDN too if available, or it might be a wheel
-            // The original code had:
-            // updateProgress(68, 'Loading lxml from CDN...')
-            // await pyodide.loadPackage(['lxml'])
-            pyodide.loadPackage('lxml')
+            pyodide.loadPackage('matplotlib'),
+            pyodide.loadPackage('scipy')
         ])
 
 
-        // 從本地 wheels 載入無法從 CDN 取得的套件（離線支援）
-        updateProgress(70, 'Loading extra packages from local wheels...')
-        const wheelsBase = new URL(import.meta.env.BASE_URL || '/', window.location.origin).href + 'wheels/'
+        // DEFERRED: Packages moved to on-demand loading in App.jsx
+        updateProgress(70, 'Initializing core environment...')
 
-        // Explicitly ensure micropip is loaded before use
+        // Wait for micropip to be fully ready
         await pyodide.loadPackage('micropip');
-
-        await pyodide.runPythonAsync(`
-import micropip
-await micropip.install([
-    '${wheelsBase}certifi-2026.1.4-py3-none-any.whl',
-    '${wheelsBase}charset_normalizer-3.4.4-py3-none-any.whl',
-    '${wheelsBase}idna-3.11-py3-none-any.whl',
-    '${wheelsBase}urllib3-2.6.3-py3-none-any.whl',
-    '${wheelsBase}requests-2.32.5-py3-none-any.whl',
-    '${wheelsBase}et_xmlfile-2.0.0-py3-none-any.whl',
-    '${wheelsBase}pyodide_http-0.2.2-py3-none-any.whl',
-    '${wheelsBase}openpyxl-3.1.5-py2.py3-none-any.whl',
-    '${wheelsBase}pandas_datareader-0.10.0-py3-none-any.whl',
-    '${wheelsBase}numpy_financial-1.0.0-py3-none-any.whl',
-    '${wheelsBase}seaborn-0.13.2-py3-none-any.whl',
-    '${wheelsBase}pymoo-0.4.1-py3-none-any.whl',
-    '${wheelsBase}setuptools-82.0.0-py3-none-any.whl',
-], deps=False, keep_going=True)
-    `)
 
         updateProgress(75, 'Configuring environment...')
         // 設定 matplotlib 使用 AGG backend (不需要 GUI)
@@ -87,11 +59,19 @@ warnings.simplefilter("ignore", SyntaxWarning)
 # 額外針對 pandas 的 pyarrow 警告進行過濾
 warnings.filterwarnings("ignore", message=".*pyarrow.*")
 
-import matplotlib
-matplotlib.use('AGG')
-import matplotlib.pyplot as plt
+try:
+    import matplotlib
+    matplotlib.use('AGG')
+    import matplotlib.pyplot as plt
+except ImportError:
+    pass
+
 import numpy as np
-import pandas as pd
+
+try:
+    import pandas as pd
+except ImportError:
+    pass
 
 import builtins
 import js
@@ -134,17 +114,23 @@ except ImportError:
     sys.modules['distutils'] = d
 
 # 網路支援
-import pyodide_http
-pyodide_http.patch_all()
+try:
+    import pyodide_http
+    pyodide_http.patch_all()
+except ImportError:
+    pass
 
 # SciPy 相容性 (binom_test 在新版本移除)
-import scipy.stats
-if not hasattr(scipy.stats, 'binom_test') and hasattr(scipy.stats, 'binomtest'):
-    def binom_test_shim(k, n=None, p=0.5, alternative='two-sided'):
-        # binomtest 返回一個物件，其屬性 pvalue 即為舊版 binom_test 的返回值
-        return scipy.stats.binomtest(k, n, p, alternative).pvalue
-    scipy.stats.binom_test = binom_test_shim
-    print("✅ SciPy 相容性：binom_test 修正補丁已套用。")
+try:
+    import scipy.stats
+    if not hasattr(scipy.stats, 'binom_test') and hasattr(scipy.stats, 'binomtest'):
+        def binom_test_shim(k, n=None, p=0.5, alternative='two-sided'):
+            # binomtest 返回一個物件，其屬性 pvalue 即為舊版 binom_test 的返回值
+            return scipy.stats.binomtest(k, n, p, alternative).pvalue
+        scipy.stats.binom_test = binom_test_shim
+        print("✅ SciPy 相容性：binom_test 修正補丁已套用。")
+except ImportError:
+    pass
 
 # Pymoo 相容性與警告抑制
 # pymoo 0.4.1 (純 Python wheel) 原生支援書中範例使用的舊版 API
@@ -188,10 +174,12 @@ except ImportError as e:
             sys.modules['pymoo.factory'] = factory
         print("✅ Pymoo 相容性：舊版 API 映射已完成（0.6.x -> 0.4.x 路徑）。")
     except Exception as e2:
-        print(f"⚠️ Pymoo Shim Error: {e2}")
-        print(f"Original Import Error (0.4.x): {e}")
+        if not isinstance(e2, ImportError):
+            print(f"⚠️ Pymoo Shim Error: {e2}")
+            print(f"Original Import Error (0.4.x): {e}")
 except Exception as e:
-    print(f"⚠️ Pymoo Shim Error: {e}")
+    if not isinstance(e, ImportError):
+        print(f"⚠️ Pymoo Shim Error: {e}")
     pass
 
 # QuantLib (ql) 強大模擬層
@@ -470,6 +458,9 @@ try:
         setattr(sys.modules['pandas_datareader.data'], method, simulated_data_reader)
         setattr(sys.modules['pandas_datareader'], method, simulated_data_reader)
     print("✅ 模擬數據引擎：攔截器已成功啟動。")
+except ImportError:
+    # Silent for lazy loading
+    pass
 except Exception as e:
     print(f"⚠️ 模擬數據引擎啟動失敗: {str(e)}")
     `)
@@ -536,22 +527,14 @@ export async function runPythonWithTimeout(pyodide, code, timeout = 30000) {
 export async function cleanupPyodide(pyodide) {
     if (!pyodide) return;
     try {
+        // Quick cleanup: only clear plots and collect GC
         await pyodide.runPythonAsync(`
 import gc
 import matplotlib.pyplot as plt
-
-# Clear plots
-try:
-    plt.close('all')
-except:
-    pass
-
-# Clear variables (keep built-ins and key modules)
-# This is aggressive, might want to be more selective in a real app
-# For now, we focus on GC
+plt.close('all')
 gc.collect()
         `);
     } catch (e) {
-        console.warn('Failed to cleanup Pyodide:', e);
+        // Silent fail for cleanup
     }
 }

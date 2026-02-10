@@ -1,48 +1,35 @@
 .content-panel {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--bg-color, #0f172a);
-  overflow: hidden;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  background: var(--bg-color, #0f172a);
+  overflow: hidden;
 }
 
 .app.dark .content-panel {
   background: #0f172a;
 }
 
+.app:not(.dark) .content-panel {
+  background: #f8fafc;
+}
+
 .content-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 0.5rem 4rem 1.5rem 4rem;
-  /* Minimized top padding to 0.5rem */
-  /* Reduced top/bottom from 3rem to 1.5rem */
-  /* Reduced from 5rem 8rem to increase visual range */
+  padding: 2.5rem 4rem;
   scroll-behavior: smooth;
-  background: var(--sidebar-bg);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-xl);
-  box-shadow: 0 12px 48px -8px rgba(0, 0, 0, 0.12);
-  margin: 0.5rem 0.75rem;
-  /* Reduced top/bottom margin to 0.5rem */
-  /* Reduced from 2rem */
 }
 
 .markdown-body {
-  max-width: 1100px;
-  /* Increased from 900px to better use desktop width */
+  max-width: 800px;
   margin: 0 auto;
   line-height: 1.8;
-  /* Reduced from 2.2 */
-  color: var(--text-main);
-  font-family: var(--font-content);
-  font-size: 1.05rem;
+  color: var(--text-main, #f1f5f9);
+}
+
+.app:not(.dark) .markdown-body {
+  color: #1e293b;
 }
 
 .markdown-body h1 {
@@ -50,24 +37,13 @@
 }
 
 .markdown-body h2 {
-  color: var(--accent-color);
-  font-family: var(--font-ui);
-  font-weight: 700;
-  margin-top: 1.5rem;
-  /* Reduced from 3rem */
+  color: var(--accent-color, #38bdf8);
+  font-weight: 600;
+  margin-top: 3rem;
   margin-bottom: 1rem;
-  /* Reduced from 1.5rem */
-  border-bottom: 3px solid var(--accent-light);
+  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
   padding-bottom: 0.5rem;
-  /* Reduced from 0.75rem */
   font-size: 1.75rem;
-  /* Slightly smaller h2 */
-  letter-spacing: -0.02em;
-}
-
-.markdown-body h2:first-child {
-  margin-top: 0;
-  /* Remove top margin if it's the first element */
 }
 
 .app:not(.dark) .markdown-body h2 {
@@ -76,14 +52,11 @@
 }
 
 .markdown-body h3 {
-  color: var(--text-main);
-  font-family: var(--font-ui);
+  color: var(--text-main, #f1f5f9);
   font-weight: 600;
-  margin-top: 1.25rem;
-  /* Reduced from 2.5rem */
+  margin-top: 2rem;
   margin-bottom: 0.75rem;
-  /* Reduced from 1rem */
-  font-size: 1.35rem;
+  font-size: 1.25rem;
 }
 
 .app:not(.dark) .markdown-body h3 {
@@ -92,31 +65,25 @@
 
 .markdown-body p {
   margin-bottom: 1rem;
-  /* Reduced from 2rem */
 }
 
 .markdown-body ul,
 .markdown-body ol {
-  margin-bottom: 1.5rem;
-  /* Reduced from 2.5rem */
+  margin-bottom: 1rem;
   padding-left: 2rem;
-  /* Reduced from 2.5rem */
 }
 
 .markdown-body li {
   margin-bottom: 0.5rem;
-  /* Reduced from 1rem */
-  /* Better list spacing */
 }
 
 .markdown-body code {
-  background: var(--accent-light);
-  padding: 0.2rem 0.5rem;
-  border-radius: 6px;
-  font-family: var(--font-mono);
-  font-size: 0.875em;
-  color: var(--accent-color);
-  font-weight: 500;
+  background: var(--glass-highlight, rgba(255, 255, 255, 0.05));
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.9em;
+  color: var(--accent-color, #38bdf8);
 }
 
 .app:not(.dark) .markdown-body code {
@@ -197,14 +164,13 @@
   cursor: pointer;
   font-weight: 600;
   transition: all 0.2s;
-  background: var(--accent-light);
-  padding: 3px 8px;
-  /* Increased padding */
-  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
   white-space: nowrap;
-  border-bottom: 2px solid rgba(56, 189, 248, 0.3);
-  font-family: var(--font-mono);
-  font-size: 0.95em;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.25);
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.9em;
 }
 
 .app:not(.dark) .code-link {
@@ -264,8 +230,7 @@
 
 /* 章節介紹 */
 .chapter-intro {
-  padding: 0.5rem 0;
-  /* Minimized from 2rem */
+  padding: 2rem 0;
 }
 
 .chapter-intro h2 {
@@ -438,22 +403,6 @@
   border-top-color: transparent;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-}
-
-/* LaTeX Math Styles */
-.markdown-body .katex-display {
-  margin: 1.5rem 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 0.5rem 0;
-}
-
-.markdown-body .katex {
-  font-size: 1.1em;
-}
-
-.markdown-body .katex-html {
-  display: inline-block;
 }
 
 @keyframes spin {

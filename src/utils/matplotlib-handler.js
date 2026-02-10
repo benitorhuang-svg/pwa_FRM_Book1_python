@@ -140,11 +140,10 @@ export async function initMatplotlib(pyodide, interactive = false) {
     const backend = interactive ? 'module://matplotlib_pyodide.wasm_backend' : 'AGG'
     await pyodide.runPythonAsync(`
 import matplotlib
-matplotlib.use('${backend}')
 import matplotlib.pyplot as plt
-
-# 設定預設樣式
-plt.style.use('default')
+matplotlib.use('${backend}')
+if plt.style.available and 'default' in plt.style.available:
+    plt.style.use('default')
     `)
 
     console.log(`✓ Matplotlib 初始化完成 (Backend: ${backend})`)
