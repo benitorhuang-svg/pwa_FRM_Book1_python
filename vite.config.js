@@ -74,7 +74,7 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10MB for wheel files
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/unpkg\.com\/pyodide@0\.26\.4\/.*/i,
+            urlPattern: /^https:\/\/(?:unpkg\.com|cdn\.jsdelivr\.net)\/pyodide@0\.26\.4\/.*/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'pyodide-cache-v2',
@@ -88,7 +88,7 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/.*/i,
+            urlPattern: /^https:\/\/(?:unpkg\.com|cdn\.jsdelivr\.net)\/.*/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'cdn-cache',

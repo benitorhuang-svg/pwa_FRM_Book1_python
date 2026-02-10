@@ -34,10 +34,15 @@ if (typeof window === 'undefined') {
 
         const useCred = coepCredentialless && r.mode === "no-cors" && r.destination !== "document";
 
+        // For cross-origin requests to CDNs, we should be careful with credentials
+        // If it's a cross-origin request, "include" might fail if the server doesn't support it.
+        // Usually "same-origin" or "omit" is safer for public CDNs unless explicitly needed.
+        const requestToFetch = r.url.includes("cdn.jsdelivr.net") || r.url.includes("unpkg.com")
+            ? new Request(r, { credentials: "omit" })
+            : r;
+
         event.respondWith(
-            fetch(r, {
-                credentials: useCred ? "omit" : "include",
-            })
+            fetch(requestToFetch)
                 .then((response) => {
                     if (response.status === 0) {
                         return response;
@@ -54,7 +59,12 @@ if (typeof window === 'undefined') {
                         headers: newHeaders,
                     });
                 })
-                .catch((e) => console.error(e))
+                .catch((e) => {
+                    console.error("COOP/COEP Fetch Error:", e, r.url);
+                    // On error, let the browser handle the original request or return a fallback
+                    // We return original fetch to avoid "Failed to convert value to 'Response'"
+                    return fetch(r);
+                })
         );
     });
 } else {
@@ -63,7 +73,7 @@ if (typeof window === 'undefined') {
         const getScriptPath = () => {
             const path = window.location.pathname;
             const base = '/pwa_FRM_Book1_python/';
-            
+
             // If we're in the GitHub Pages subdirectory
             if (path.startsWith(base)) {
                 return base + 'coi-serviceworker.js';
@@ -100,7 +110,7 @@ if (typeof window === 'undefined') {
 
         // Prevent infinite reload loop
         const reloadedBySelf = window.sessionStorage.getItem("coiReloadedBySelf");
-        
+
         if (reloadedBySelf) {
             window.sessionStorage.removeItem("coiReloadedBySelf");
             console.error("❌ COOP/COEP Service Worker failed to activate after reload");
@@ -116,7 +126,7 @@ if (typeof window === 'undefined') {
             .then((registration) => {
                 console.log("✅ COOP/COEP Service Worker registered successfully");
                 console.log("🔄 Reloading page to activate cross-origin isolation...");
-                
+
                 // Wait for the service worker to be active
                 if (registration.active) {
                     window.sessionStorage.setItem("coiReloadedBySelf", "true");
