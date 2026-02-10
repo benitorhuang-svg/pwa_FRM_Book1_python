@@ -723,7 +723,7 @@
         "id": "ex6",
         "title": "10.6 B1_Ch10_6.py",
         "filename": "B1_Ch10_6.py",
-        "code": "# B1_Ch10_6.py\n\n###############\n# Prepared by Jianbin Liang, Ran An, and Wei Lu,\n# Editor-in-chief: Weisheng Jiang, and Sheng Tu\n# Book 1  |  Financial Risk Management with Python\n# Published and copyrighted by Tsinghua University Press\n# Beijing, China, 2021\n###############\n\ndef pvfix(y_p, nper, pmt, fv):\n    \n    '''\n    r_p : periodic interest rate\n    nper: number of payment periods\n    pmt : periodic payment\n    fv  : payment received other than pmt \n    in the end of the last period\n    '''\n    pv = pmt*((1.0 + y_p)**nper - 1.0)/(1.0 + y_p)**nper/y_p + \\\n    fv/(1.0 + y_p)**nper;\n    \n    return pv\n\ny = 0.05;  # annual interest rate\nm = 4;     # compounding frequency\nT = 5;     # years\nc = 10;    # annual payment\npmt = c/m  # periodic payment\nfv = 100;  # payment at the end\n\nPV = pvfix(y/m, m*T, pmt, fv)\n"
+        "code": "# B1_Ch10_6.py\n\n###############\n# Prepared by Jianbin Liang, Ran An, and Wei Lu,\n# Editor-in-chief: Weisheng Jiang, and Sheng Tu\n# Book 1  |  Financial Risk Management with Python\n# Published and copyrighted by Tsinghua University Press\n# Beijing, China, 2021\n###############\n\ndef pvfix(y_p, nper, pmt, fv):\n    \n    '''\n    r_p : periodic interest rate\n    nper: number of payment periods\n    pmt : periodic payment\n    fv  : payment received other than pmt \n    in the end of the last period\n    '''\n    pv = pmt*((1.0 + y_p)**nper - 1.0)/(1.0 + y_p)**nper/y_p + \\\n    fv/(1.0 + y_p)**nper;\n    \n    return pv\n\ny = 0.05;  # annual interest rate\nm = 4;     # compounding frequency\nT = 5;     # years\nc = 10;    # annual payment\npmt = c/m  # periodic payment\nfv = 100;  # payment at the end\n\nPV = pvfix(y/m, m*T, pmt, fv)\nprint(\"Present Value (PV) = \" + str(round(PV, 4)))\n"
       },
       {
         "id": "ex7",
@@ -735,7 +735,7 @@
         "id": "ex8",
         "title": "10.8 B1_Ch10_8.py",
         "filename": "B1_Ch10_8.py",
-        "code": "# B1_Ch10_8.py\n\n###############\n# Prepared by Jianbin Liang, Ran An, and Wei Lu,\n# Editor-in-chief: Weisheng Jiang, and Sheng Tu\n# Book 1  |  Financial Risk Management with Python\n# Published and copyrighted by Tsinghua University Press\n# Beijing, China, 2021\n###############\n\nimport numpy as np\n\nCFs = [-400, 120, 80, 180, 100];\nCFs_flip = CFs[::-1]\n\nroots = np.roots(CFs_flip)\nmask = (roots.imag == 0) & (roots.real > 0)\n\nx = roots[mask].real\n\nirr_replicated = 1/x - 1\n\nirr_result = np.irr(CFs)\nprint(\"IRR = \" + str(round(irr_result,5)))\n"
+        "code": "# B1_Ch10_8.py\n\n###############\n# Prepared by Jianbin Liang, Ran An, and Wei Lu,\n# Editor-in-chief: Weisheng Jiang, and Sheng Tu\n# Book 1  |  Financial Risk Management with Python\n# Published and copyrighted by Tsinghua University Press\n# Beijing, China, 2021\n###############\n\nimport numpy as np\nimport numpy_financial as npf\n\nCFs = [-400, 120, 80, 180, 100];\nCFs_flip = CFs[::-1]\n\nroots = np.roots(CFs_flip)\nmask = (roots.imag == 0) & (roots.real > 0)\n\nx = roots[mask].real\n\nirr_replicated = 1/x - 1\n\nirr_result = npf.irr(CFs)\nprint(\"IRR = \" + str(round(irr_result,5)))\n"
       },
       {
         "id": "ex9",
