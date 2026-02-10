@@ -42,6 +42,14 @@
 - **CodePreviewPanel.jsx**: 核心交互面板，採用 VSCode 風格的 `Resizer` (GripVertical 圖標與藍色高亮導軌)，支援寬度持久化。
 - **FloatingOutput.jsx**: 獨立的 Portal 視窗，顯示 Python 標準輸出 (stdout) 與 Matplotlib 繪圖結果。
 
+### 2.2 混合式 Service Worker 策略 (Hybrid Service Worker Strategy)
+
+為了同時滿足 **PWA 離線能力** 與 **Pyodide 高效能運算** (需 SharedArrayBuffer 支援)，本專案採用自定義 Service Worker (`src/sw.js`)：
+
+1.  **Cross-Origin Isolation (COI)**: Service Worker 攔截所有 `fetch` 請求，並動態注入 `Cross-Origin-Opener-Policy: same-origin` 與 `Cross-Origin-Embedder-Policy: require-corp` 標頭。這確保了瀏覽器啟用 SharedArrayBuffer，讓 Pyodide 能使用高效能的運算模式。
+2.  **Workbox Pre-caching**: 整合 `workbox-precaching`，將建置產物 (HTML, JS, CSS) 與關鍵 Python 套件 (`.whl`) 進行預快取，確保離線可用性。
+3.  **單一控制源**: 透過 `InjectManifest` 模式，將 COI 邏輯與 Workbox 邏輯合併於同一個 SW 實例中，避免了多個 Service Worker 爭奪頁面控制權導致的 Race Condition。
+
 ### 2.2 資料流與本地儲存模式
 
 - **唯讀資料**: `public/data/chapters.json` (由 `build-chapters.py` 生成)，應用啟動時一次性請求。
@@ -70,10 +78,15 @@
 
 - **並行預載入策略 (Parallel Pre-loading)**:
 
-  - 在 `pyodide-loader.js` 中利用 `Promise.all` 同時下載並初始化 `numpy`, `pandas`, `matplotlib`, `scipy`。
-  - **優點**: 充分利用瀏覽器並行下載能力。
-  - **代價**: 初始載入進度條會延長約 5-8 秒。
+  - 在 `pyodide-loader.js` 中利用 `Promise.all` **同時並行下載** 核心套件 (`numpy`, `pandas`, `matplotlib`, `scipy`)。
+  - **優點**: 充分利用瀏覽器並行下載能力，在寬頻網路下可顯著縮短等待時間。
+  - **代價**: 瞬間頻寬佔用較高。
   - **效果**: 消除使用者執行第一個範例時的「冷啟動」延遲，提供即時運算體驗。
+
+- **Shim 代碼模組化 (Modularized Shims)**:
+  - 將龐大的相容性代碼 (QuantLib Mock, Pymoo Shim) 提取至 `src/utils/python-shims.js`。
+  - 減少 `pyodide-loader.js` 的體積，並允許未來實作按需載入 (Lazy Evaluation)。
+
 - **三層依賴檢查機制 (Triple-Layer Dependency Guard)**:
 
   1. **硬排除 (Hard- **標準庫排除清單**: 在 `ensureDependencies` 中明確排除 `time`, `random`, `csv`, `copy`, `os`, `sys` 等內建標準庫，防止 `micropip` 誤抓取導致的 `ValueError`。
@@ -89,8 +102,8 @@
   - **解決方案**: 實作 `resizer-overlay`。在 `isDragging` 狀態為 `true` 時，於全螢幕顯示一個透明且 `z-index` 極高的遮罩，強制接管所有滑鼠事件，確保調整過程絕對流暢。
 - **Matplotlib 智能後端切換 (Smart Backend Logic)**:
 
-  - 預設使用 `AGG` 後端以獲得極速的圖表渲染與 Base64 轉換。
-  - 當偵測到程式碼含有 `matplotlib.widgets` (如 Slider) 時，自動切換至 `module://matplotlib_pyodide.wasm_backend`，啟用完整的 HTML5 Canvas 交互支援。
+  - **通用後端**: 使用 Pyodide 預設的瀏覽器相容後端 (Wasm/Canvas)，確保 `plt.show()` 可以正常觸發並顯示圖表，同時消除 `UserWarning: Matplotlib is currently using agg` 警告。
+  - 當偵測到程式碼含有 `matplotlib.widgets` (如 Slider) 時，Pyodide 會自動處理交互支援。
 - **滾動行為優化 (Scroll Management)**:
 
   - **章節置頂**: 監聽 `chapter` 變化，強制重置 `.content-scroll` 的 `scrollTop`。

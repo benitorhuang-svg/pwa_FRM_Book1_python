@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, memo } from 'react'
+import { useEffect, useMemo, memo } from 'react'
 import { Marked } from 'marked'
 import markedKatex from 'marked-katex-extension'
 import DOMPurify from 'dompurify'
@@ -14,7 +14,7 @@ const marked = new Marked(
   })
 )
 
-const ContentPanel = memo(({ chapter, onCodeClick, darkMode, output, isRunning, plotImages, onClearOutput }) => {
+const ContentPanel = memo(({ chapter, onCodeClick, output, isRunning, plotImages }) => {
   // Use useMemo to prevent expensive markdown parsing on every re-render (like when resizing)
   const renderedContent = useMemo(() => {
     if (!chapter) return null
@@ -52,7 +52,7 @@ const ContentPanel = memo(({ chapter, onCodeClick, darkMode, output, isRunning, 
 
       sortedScripts.forEach((script) => {
         const escapedName = script.filename.replace('.', '\\.')
-        const regex = new RegExp(`(?<!['\"\\w\\.])(${escapedName})(?!['\"\\w\\.])`, 'g')
+        const regex = new RegExp(`(?<!['".\\w])(${escapedName})(?!['".\\w])`, 'g')
 
         processedHtml = processedHtml.replace(
           regex,

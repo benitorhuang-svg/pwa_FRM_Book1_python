@@ -31,7 +31,9 @@ def extract_title_from_code(code):
         if line.startswith('#') and not line.startswith('###'):
             # 移除 # 符號和空白
             title = line.lstrip('#').strip()
-            if title and not title.startswith('Prepared by') and not title.startswith('Book'):
+            if (title and 
+                not title.startswith('Prepared by') and 
+                not title.startswith('Book')):
                 return title
     return None
 
@@ -46,7 +48,7 @@ def natural_sort_key(path):
     if 'B1_Ch' in name and '_' not in name.replace('B1_Ch', ''):
         try:
             return int(re.search(r'B1_Ch(\d+)', name).group(1))
-        except:
+        except Exception:
             return name
             
     # 處理範例檔案 .*_(\d+).py
@@ -54,7 +56,7 @@ def natural_sort_key(path):
         # 提取檔名最後的數字 (排除副檔名)
         last_part = path.stem.split('_')[-1]
         return int(last_part)
-    except:
+    except Exception:
         return name
 
 def build_chapters_json():
@@ -63,9 +65,10 @@ def build_chapters_json():
     # 找到 Book1 的程式碼目錄
     base_path = Path(__file__).parent.parent
     # 找到 Markdown 目錄
-    markdown_dir = base_path.parent / 'Book1_手術刀般精準的FRM用Python科學管控財金風險_基礎篇' / 'Chapter_Markdowns'
+    book_name = 'Book1_手術刀般精準的FRM用Python科學管控財金風險_基礎篇'
+    markdown_dir = base_path.parent / book_name / 'Chapter_Markdowns'
     # 找到 Book1 的程式碼目錄
-    code_dir = base_path.parent / 'Book1_手術刀般精準的FRM用Python科學管控財金風險_基礎篇' / 'Book1_Python_Code'
+    code_dir = base_path.parent / book_name / 'Book1_Python_Code'
 
     if not code_dir.exists():
         print(f"錯誤：找不到目錄 {code_dir}")
@@ -132,7 +135,7 @@ def build_chapters_json():
             # 提取章節數字
             try:
                 chapter_num = int(re.search(r'B1_Ch(\d+)', chapter_id).group(1))
-            except:
+            except Exception:
                 chapter_num = 0
 
             chapters.append({

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Play, Copy, X, Maximize2, Minimize2, GripVertical } from 'lucide-react'
+import { Play, Copy, X, GripVertical } from 'lucide-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import './CodePreviewPanel.css'
@@ -9,14 +9,9 @@ function CodePreviewPanel({
   onClose,
   onRun,
   isRunning,
-  output,
-  images,
-  isInteractive,
   darkMode,
-  width,
   onResize
 }) {
-  const [isExpanded, setIsExpanded] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [copied, setCopied] = useState(false)
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' })

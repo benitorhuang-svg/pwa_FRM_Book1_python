@@ -14,18 +14,15 @@ function ChapterNav({ onChapterSelect, bookmarkedChapters, onToggleBookmark, sho
 
     // 使用相對路徑，Vite 會自動處理 base
     const url = `${import.meta.env.BASE_URL}data/chapters.json?t=${Date.now()}`
-    console.log('Fetching chapters from:', url)
 
     fetch(url)
       .then(res => {
-        console.log('Response status:', res.status)
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`)
         }
         return res.json()
       })
       .then(data => {
-        console.log('Loaded chapters:', data)
         if (data && data.length > 0) {
           setChapters(data)
           setExpandedChapters(new Set([data[0].id]))

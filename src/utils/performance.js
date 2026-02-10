@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * 效能監控工具
  */

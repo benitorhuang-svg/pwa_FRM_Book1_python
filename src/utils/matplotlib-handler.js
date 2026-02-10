@@ -146,7 +146,7 @@ if plt.style.available and 'default' in plt.style.available:
     plt.style.use('default')
     `)
 
-    console.log(`✓ Matplotlib 初始化完成 (Backend: ${backend})`)
+    // Matplotlib initialized successfully
   } catch (error) {
     console.error('✗ Matplotlib 初始化失敗:', error)
   }

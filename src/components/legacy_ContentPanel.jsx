@@ -3,7 +3,7 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import './ContentPanel.css'
 
-function ContentPanel({ chapter, onCodeClick, darkMode, output, isRunning, plotImages }) {
+function ContentPanel({ chapter, onCodeClick, output, isRunning, plotImages }) {
   const [content, setContent] = useState('')
 
   useEffect(() => {
@@ -28,11 +28,11 @@ function ContentPanel({ chapter, onCodeClick, darkMode, output, isRunning, plotI
         // 先按長度排序，避免部分匹配（雖然後綴.py應該能避免）
         const sortedScripts = [...scripts].sort((a, b) => b.filename.length - a.filename.length)
 
-        sortedScripts.forEach((script, index) => {
+        sortedScripts.forEach((script) => {
           // 轉義特殊字符用於正則
           const escapedName = script.filename.replace('.', '\\.')
           // 匹配完整單詞
-          const regex = new RegExp(`(?<!['\"\\w\\.])(${escapedName})(?!['\"\\w\\.])`, 'g')
+          const regex = new RegExp(`(?<!['"\\w\\.])(${escapedName})(?!['"\\w\\.])`, 'g')
 
           processedHtml = processedHtml.replace(
             regex,

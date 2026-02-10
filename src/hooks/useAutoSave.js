@@ -29,7 +29,6 @@ export function useAutoSave(chapterId, exampleId, code, delay = 2000) {
       try {
         await saveCode(chapterId, exampleId, code)
         savedCodeRef.current = code
-        console.log('✓ 程式碼已自動儲存')
       } catch (error) {
         console.error('✗ 自動儲存失敗:', error)
       }

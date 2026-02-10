@@ -101,4 +101,4 @@
 
 ### 5.4 套件執行相容性 (Pyodide Compatibility)
 - **pylab 映射**: 針對書中大量使用的 `import pylab`，在 `App.jsx` 的 `MODULE_MAPPING` 中將其強制映射至 `matplotlib`，避免 `micropip` 嘗試安裝不存在的虛擬套件而報錯。
-- **Matplotlib 背景**: 預設使用 `AGG` Backend 以提高渲染速度，僅在偵測到交互式組件（如 `Slider`）時自動切換至 `Wasm` Backend。
+- **Matplotlib 背景**: 使用 Pyodide 預設後端以支援瀏覽器圖表渲染，確保使用者能看到繪圖結果。

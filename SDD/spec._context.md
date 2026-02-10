@@ -22,6 +22,7 @@
 ### 4.1 Python 執行環境 (Pyodide Engine)
 
 - **核心引擎**：基於 Pyodide 0.26.4。
+- **效能優化**：採用 `Promise.all` 實現核心套件 (NumPy, Pandas, Matplotlib, SciPy) 的 **平行預載入 (Parallel Pre-loading)**，顯著縮短應用初始化時間。
 - **科學套件支援**：必須預裝並支援 NumPy, Pandas, Matplotlib, SciPy, Statsmodels, SymPy, Seaborn, Pymoo 等金融工程與數據分析必備套件。
 - **圖表捕捉**：需具備自定義 Handler，截獲 `matplotlib.pyplot.show()` 調用，並將產出的 Canvas 渲染為網頁中的可視化組件（支援下載為圖檔）。
 - **執行保護**：
@@ -37,9 +38,9 @@
 ### 4.3 PWA 與離線功能
 
 - **可安裝性**：需符合 Web App Manifest 規範，提供完整的圖示 (72x72 至 512x512)。
-- **緩存策略**：
-  - 使用 Service Worker 預緩存核心 JS 包、CSS 與靜態資源。
-  - 對於體積較大的 Python Wheel 檔案 (.whl)，採用動態緩存策略。
+- **混合式 Service Worker 架構**：
+  - **Workbox Pre-caching**: 預先快取核心 JS 包、CSS 與靜態資源，確保離線可用。
+  - **COI 標頭注入**: Service Worker 攔截請求並注入 `Cross-Origin-Opener-Policy` 與 `Cross-Origin-Embedder-Policy` 標頭，為 Pyodide 提供 SharedArrayBuffer 支援。
 - **離線狀態指示**：在離線時能正常顯示已緩存的章節與範例程式碼。
 
 ### 4.4 學習追蹤與導航

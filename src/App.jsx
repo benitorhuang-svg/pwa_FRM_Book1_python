@@ -90,10 +90,6 @@ function App() {
       setLoadingProgress(progress)
       setLoadingMessage(message)
     }).then(py => {
-      console.log('🚀 App initialized at:', new Date().toISOString())
-      console.log('📍 Current URL:', window.location.href)
-      console.log('📦 Base URL:', import.meta.env.BASE_URL)
-
       setPyodide(py)
       setLoading(false)
       perfMonitor.end('pyodide-init')
@@ -114,10 +110,7 @@ function App() {
 
       // Listen for controller change (new worker activated)
       const handleControllerChange = () => {
-        if (!document.hidden) {
-          // Only prompt if user is likely active
-          console.log('New Service Worker activated.')
-        }
+        // New Service Worker activated - no action needed
       }
       navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange)
 
@@ -133,7 +126,6 @@ function App() {
           const estimate = await navigator.storage.estimate()
           if (estimate.usage && estimate.quota) {
             const percentUsed = (estimate.usage / estimate.quota) * 100
-            console.log(`Storage usage: ${percentUsed.toFixed(2)}%`)
             if (percentUsed > 80) {
               console.warn('Storage usage is high (>80%). Consider cleaning up.')
             }
