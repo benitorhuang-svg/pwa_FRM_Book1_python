@@ -1,17 +1,18 @@
 import { useState, useEffect, useMemo, memo } from 'react'
-import { marked } from 'marked'
+import { Marked } from 'marked'
 import markedKatex from 'marked-katex-extension'
 import DOMPurify from 'dompurify'
 import './ContentPanel.css'
 
-// Configure KaTeX extension
-const katexOptions = {
-  throwOnError: false,
-  nonStandardPlaceholder: true,
-  // Let the extension decide displayMode based on $ vs $$ delimiters
-}
-
-marked.use(markedKatex(katexOptions))
+// Configure KaTeX extension with proper delimiters
+// Create a dedicated Marked instance to avoid global state pollution and HMR issues
+const marked = new Marked(
+  markedKatex({
+    throwOnError: false,
+    output: 'html',
+    nonStandard: true // Ensure $ delimiters are enabled
+  })
+)
 
 const ContentPanel = memo(({ chapter, onCodeClick, darkMode, output, isRunning, plotImages, onClearOutput }) => {
   // Use useMemo to prevent expensive markdown parsing on every re-render (like when resizing)
@@ -24,11 +25,24 @@ const ContentPanel = memo(({ chapter, onCodeClick, darkMode, output, isRunning, 
         ''
       )
 
+      // Pre-process for KaTeX: Ensure proper spacing around math delimiters
+      // Fix display math blocks ($$) and inline math ($)
+      rawMarkdown = rawMarkdown
+        // Ensure display math blocks have proper newlines
+        .replace(/\s*\$\$\s*/g, '\n$$\n')
+        // Remove extra spaces inside inline math delimiters
+        .replace(/\$\s+(.*?)\s+\$/g, '$$$1$')
+
       const rawHtml = marked.parse(rawMarkdown)
 
       const cleanHtml = DOMPurify.sanitize(rawHtml, {
-        ADD_TAGS: ['math', 'annotation', 'semantics', 'mrow', 'msub', 'msup', 'msubsup', 'mover', 'munder', 'munderover', 'mmultiscripts', 'mprec', 'mnext', 'mtable', 'mtr', 'mtd', 'mfrac', 'msqrt', 'mroot', 'mstyle', 'merror', 'mpadded', 'mphantom', 'mfenced', 'menclose', 'ms', 'mglyph', 'maligngroup', 'malignmark', 'maction', 'svg', 'path', 'use', 'span'],
-        ADD_ATTR: ['target', 'xlink:href', 'class', 'style', 'aria-hidden', 'viewBox', 'd', 'fill', 'stroke', 'stroke-width']
+        ADD_TAGS: [
+          'math', 'annotation', 'semantics', 'mrow', 'msub', 'msup', 'msubsup', 'mover', 'munder', 'munderover',
+          'mmultiscripts', 'mprec', 'mnext', 'mtable', 'mtr', 'mtd', 'mfrac', 'msqrt', 'mroot', 'mstyle', 'merror',
+          'mpadded', 'mphantom', 'mfenced', 'menclose', 'ms', 'mglyph', 'maligngroup', 'malignmark', 'maction',
+          'svg', 'path', 'use', 'span', 'div' // Add div for KaTeX block display
+        ],
+        ADD_ATTR: ['target', 'xlink:href', 'class', 'style', 'aria-hidden', 'viewBox', 'd', 'fill', 'stroke', 'stroke-width', 'data-filename']
       })
 
       let processedHtml = cleanHtml

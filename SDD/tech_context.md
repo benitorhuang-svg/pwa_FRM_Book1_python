@@ -26,6 +26,13 @@
   - `vite-plugin-pwa 0.21`: 自動生成 Service Worker 與 Manifest。
   - `Workbox`: 執行時資源快取策略。
 
+### 1.3 數學渲染引擎 (Mathematical Rendering)
+
+- **KaTeX**: 採用 `Marked` + `marked-katex-extension` 的組合，並針對台灣使用習慣進行了特殊調校：
+  - **Inline Math**: 支援標準 `$...$` 行內數學公式 (需開啟 `nonStandard: true` 選項)。
+  - **Display Math**: 支援 `$$...$$` 區塊數學公式。
+  - **隔離實例 (Isolated Instance)**: 為了解決 SPA 與 HMR (熱模組替換) 環境下的狀態污染問題，`ContentPanel` 採用獨立的 `Marked` 實例而非全域單例。
+
 ## 2. 系統架構細節 (System Architecture)
 
 ### 2.1 組件層代碼組織 (Directory: `src/components/`)
