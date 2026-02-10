@@ -121,6 +121,7 @@ export default defineConfig({
   build: {
     cssCodeSplit: true,
     sourcemap: false,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       external: [
         'node:url',
@@ -145,6 +146,9 @@ export default defineConfig({
             }
             if (id.includes('lucide-react')) {
               return 'vendor-icons';
+            }
+            if (id.includes('katex') || id.includes('marked-katex-extension')) {
+              return 'vendor-katex';
             }
             if (id.includes('marked') || id.includes('dompurify') || id.includes('react-syntax-highlighter')) {
               return 'vendor-utils';
