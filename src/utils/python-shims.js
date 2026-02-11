@@ -397,10 +397,16 @@ try:
     import setuptools
     import distutils
 except ImportError:
-    # 如果 setuptools 沒提供，建立虛擬模組避免 error
     from types import ModuleType
     d = ModuleType('distutils')
+    d.version = ModuleType('distutils.version')
+    d.util = ModuleType('distutils.util')
+    d.spawn = ModuleType('distutils.spawn')
     sys.modules['distutils'] = d
+    sys.modules['distutils.version'] = d.version
+    sys.modules['distutils.util'] = d.util
+    sys.modules['distutils.spawn'] = d.spawn
+    print("✅ distutils 相容性：已建立虛擬模組。")
 
 # 網路支援
 try:

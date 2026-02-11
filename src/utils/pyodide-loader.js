@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 let pyodideInstance = null
 let initializationPromise = null
-import { QUANTLIB_SHIM, PYMOO_SHIM } from './python-shims'
+import { QUANTLIB_SHIM, PYMOO_SHIM, BASE_ENV_SETUP, PANDAS_DATAREADER_SHIM } from './python-shims'
 
 class SmoothProgress {
     constructor(onProgress) {
@@ -116,7 +116,7 @@ export async function loadPyodide(onProgress) {
             // Core Pyodide distribution packages
             const corePackages = ['numpy', 'pandas', 'matplotlib', 'scipy', 'micropip'];
             // Third-party packages (not in distribution)
-            const pipPackages = ['numpy-financial'];
+            const pipPackages = ['numpy-financial', 'pandas-datareader', 'pyodide-http'];
             const installedFiles = pyodide.FS.readdir(SITE_PACKAGES);
 
             const coreToLoad = corePackages.filter(pkg => {
@@ -212,8 +212,10 @@ except: pass
             smoother.update(98, '🚀 系統：正在啟動 Pymoo & QuantLib 虛擬層...')
             await smoother.yieldToUI();
             await Promise.all([
+                pyodide.runPythonAsync(BASE_ENV_SETUP),
                 pyodide.runPythonAsync(PYMOO_SHIM),
-                pyodide.runPythonAsync(QUANTLIB_SHIM)
+                pyodide.runPythonAsync(QUANTLIB_SHIM),
+                pyodide.runPythonAsync(PANDAS_DATAREADER_SHIM)
             ]);
 
             smoother.update(99, '🛡️ 系統：權限校正與輸入掛鉤注入...')
