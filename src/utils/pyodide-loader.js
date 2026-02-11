@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 let pyodideInstance = null
 let initializationPromise = null
-import { QUANTLIB_SHIM, PYMOO_SHIM, BASE_ENV_SETUP, PANDAS_DATAREADER_SHIM, SCIPY_RVS_SHIM } from './python-shims'
+import { QUANTLIB_SHIM, PYMOO_SHIM, BASE_ENV_SETUP, PANDAS_DATAREADER_SHIM, SCIPY_RVS_SHIM, SCIPY_STUB } from './python-shims'
 
 const PYODIDE_CDNS = [
     'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js',
@@ -247,7 +247,9 @@ except: pass
 
             smoother.update(98, '🚀 系統：正在啟動 Pymoo & QuantLib 虛擬層...')
             await smoother.yieldToUI();
+            // Run environment shims (including a SciPy import-safe stub)
             await Promise.all([
+                pyodide.runPythonAsync(SCIPY_STUB),
                 pyodide.runPythonAsync(BASE_ENV_SETUP),
                 pyodide.runPythonAsync(PYMOO_SHIM),
                 pyodide.runPythonAsync(QUANTLIB_SHIM),

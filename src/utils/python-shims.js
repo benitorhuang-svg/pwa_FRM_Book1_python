@@ -381,6 +381,272 @@ except Exception:
     pass
 `;
 
+export const SCIPY_STUB = `
+# Lightweight SciPy stub to avoid ImportError in restricted environments
+try:
+    import scipy
+except Exception:
+    import types, sys
+    import numpy as np
+    import math
+
+    scipy = types.ModuleType('scipy')
+    stats = types.ModuleType('scipy.stats')
+
+    def _ensure_array(x):
+        return np.array(x)
+
+    def _scalar_or_array(func):
+        def wrapper(x, *args, **kwargs):
+            x_arr = np.array(x)
+            if x_arr.shape == ():
+                return func(float(x), *args, **kwargs)
+            return np.array([func(float(xi), *args, **kwargs) for xi in x_arr])
+        return wrapper
+
+    # Normal distribution
+    def norm(loc=0.0, scale=1.0):
+        class N:
+            name = 'norm'
+            def rvs(self, size=None, **kwargs):
+                return np.random.normal(loc, scale, size=size)
+            @_scalar_or_array
+            def pdf(self, x):
+                return math.exp(-0.5*((x-loc)/scale)**2)/(scale*math.sqrt(2*math.pi))
+            @_scalar_or_array
+            def cdf(self, x):
+                return 0.5*(1+math.erf((x-loc)/(scale*math.sqrt(2))))
+            def ppf(self, q):
+                # numeric inverse via bisection
+                def cdf_fn(x):
+                    return 0.5*(1+math.erf((x-loc)/(scale*math.sqrt(2))))
+                def scalar_ppf(qi):
+                    a = loc - 10*scale
+                    b = loc + 10*scale
+                    for _ in range(60):
+                        m = 0.5*(a+b)
+                        if cdf_fn(m) < qi:
+                            a = m
+                        else:
+                            b = m
+                    return 0.5*(a+b)
+                if hasattr(q, '__iter__'):
+                    return np.array([scalar_ppf(float(qi)) for qi in q])
+                return scalar_ppf(float(q))
+            def stats(self, moments='mvsk'):
+                return loc, scale**2, None, None
+        return N()
+
+    # Bernoulli
+    def bernoulli(p=0.5):
+        class B:
+            name = 'bernoulli'
+            def rvs(self, size=None, **kwargs):
+                return np.random.binomial(1, p, size=size)
+            def pmf(self, k):
+                k_arr = np.array(k)
+                return np.where(k_arr==1, p, 1-p)
+            def stats(self, moments='mvsk'):
+                return p, p*(1-p), None, None
+        return B()
+
+    # Binomial
+    def binom(n, p):
+        class Bn:
+            name = 'binom'
+            def rvs(self, size=None, **kwargs):
+                return np.random.binomial(n, p, size=size)
+            def pmf(self, k):
+                k_arr = np.atleast_1d(k)
+                res = []
+                for ki in k_arr:
+                    from math import comb
+                    res.append(comb(int(n), int(ki)) * (p**int(ki)) * ((1-p)**(int(n)-int(ki))))
+                return np.array(res).reshape(np.array(k).shape)
+            def stats(self, moments='mvsk'):
+                mean = n*p
+                var = n*p*(1-p)
+                return mean, var, None, None
+        return Bn()
+
+    # Uniform
+    def uniform(loc=0.0, scale=1.0):
+        class U:
+            name = 'uniform'
+            def rvs(self, size=None, **kwargs):
+                return np.random.uniform(loc, loc+scale, size=size)
+            @_scalar_or_array
+            def pdf(self, x):
+                return 1.0/scale if (loc <= x <= loc+scale) else 0.0
+            @_scalar_or_array
+            def cdf(self, x):
+                return min(max((x-loc)/scale, 0.0), 1.0)
+        return U()
+
+    # Exponential
+    def expon(scale=1.0, loc=0.0):
+        class E:
+            name = 'expon'
+            def rvs(self, size=None, **kwargs):
+                return np.random.exponential(scale, size=size) + loc
+            @_scalar_or_array
+            def pdf(self, x):
+                if x < loc:
+                    return 0.0
+                return (1.0/scale) * math.exp(-(x-loc)/scale)
+            @_scalar_or_array
+            def cdf(self, x):
+                if x < loc:
+                    return 0.0
+                return 1 - math.exp(-(x-loc)/scale)
+        return E()
+
+    # Poisson
+    def poisson(mu):
+        class P:
+            name = 'poisson'
+            def rvs(self, size=None, **kwargs):
+                return np.random.poisson(mu, size=size)
+            def pmf(self, k):
+                k_arr = np.atleast_1d(k)
+                res = []
+                from math import factorial
+                for ki in k_arr:
+                    res.append(math.exp(-mu) * mu**int(ki) / factorial(int(ki)))
+                return np.array(res).reshape(np.array(k).shape)
+            def stats(self, moments='mvsk'):
+                return mu, mu, None, None
+        return P()
+
+    # Geometric
+    def geom(p=0.5):
+        class G:
+            name = 'geom'
+            def rvs(self, size=None, **kwargs):
+                return np.random.geometric(p, size=size)
+            def pmf(self, k):
+                k_arr = np.atleast_1d(k)
+                res = [(1-p)**(int(ki)-1) * p for ki in k_arr]
+                return np.array(res).reshape(np.array(k).shape)
+            def stats(self, moments='mvsk'):
+                mean = 1.0/p
+                var = (1-p)/(p**2)
+                return mean, var, None, None
+        return G()
+
+    # RandInt
+    def randint(low, high=None):
+        if high is None:
+            low, high = 0, low
+        class R:
+            name = 'randint'
+            def rvs(self, size=None, **kwargs):
+                return np.random.randint(low, high, size=size)
+        return R()
+
+    # Beta
+    def beta(a, b):
+        class BETA:
+            name = 'beta'
+            def rvs(self, size=None, **kwargs):
+                return np.random.beta(a, b, size=size)
+            def mean(self):
+                return a / (a + b)
+            def stats(self, moments='mvsk'):
+                mean = a / (a + b)
+                var = a*b / ((a + b)**2 * (a + b + 1))
+                return mean, var, None, None
+        return BETA()
+
+    # Gamma
+    def gamma(shape, scale=1.0):
+        class GAM:
+            name = 'gamma'
+            def rvs(self, size=None, **kwargs):
+                return np.random.gamma(shape, scale, size=size)
+            def mean(self):
+                return shape * scale
+            def stats(self, moments='mvsk'):
+                mean = shape * scale
+                var = shape * (scale**2)
+                return mean, var, None, None
+        return GAM()
+
+    stats.norm = norm
+    stats.bernoulli = bernoulli
+    stats.binom = binom
+    stats.uniform = uniform
+    stats.expon = expon
+    stats.poisson = poisson
+    stats.beta = beta
+    stats.gamma = gamma
+    stats.geom = geom
+    stats.randint = randint
+
+    scipy.stats = stats
+    sys.modules['scipy'] = scipy
+    sys.modules['scipy.stats'] = stats
+    print('✅ SciPy stub installed (enhanced).')
+
+    # Provide a minimal scipy.linalg stub for common examples (pascal, ldl)
+    linalg = types.ModuleType('scipy.linalg')
+
+    def pascal(n):
+        import numpy as _np
+        from math import comb
+        M = _np.zeros((n, n), dtype=int)
+        for i in range(n):
+            for j in range(n):
+                ii = i
+                jj = j
+                if jj < ii:
+                    M[i, j] = comb(ii, jj)
+                else:
+                    M[i, j] = comb(jj, ii)
+        return M
+
+    def ldl(A):
+        import numpy as _np
+        A = _np.array(A)
+        n = A.shape[0]
+        # Try Cholesky for positive-definite matrices
+        try:
+            L = _np.linalg.cholesky(A)
+            D = _np.eye(n)
+            P = None
+            return L, D, P
+        except Exception:
+            # Fallback: eigen-decomposition (not triangular but satisfies A = V D V.T)
+            evals, evecs = _np.linalg.eigh(A)
+            D = _np.diag(evals)
+            L = evecs
+            P = None
+            return L, D, P
+
+    # Additional common linear algebra helpers
+    def eig(A):
+        import numpy as _np
+        vals, vecs = _np.linalg.eig(_np.array(A))
+        return vals, vecs
+
+    def inv(A):
+        import numpy as _np
+        return _np.linalg.inv(_np.array(A))
+
+    def solve(a, b):
+        import numpy as _np
+        return _np.linalg.solve(_np.array(a), _np.array(b))
+
+    linalg.pascal = pascal
+    linalg.ldl = ldl
+    linalg.eig = eig
+    linalg.inv = inv
+    linalg.solve = solve
+    scipy.linalg = linalg
+    sys.modules['scipy.linalg'] = linalg
+
+`;
+
 export const BASE_ENV_SETUP = `
 import warnings
 # 忽略 DeprecationWarning 和 FutureWarning，保持 Console 乾淨
@@ -396,6 +662,15 @@ except ImportError:
     pass
 
 import numpy as np
+
+# Ensure Matplotlib uses a non-GUI backend and set a reliable default font
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib as mpl
+    mpl.rcParams['font.family'] = ['DejaVu Sans', 'sans-serif']
+except Exception:
+    pass
 
 try:
     import pandas as pd
