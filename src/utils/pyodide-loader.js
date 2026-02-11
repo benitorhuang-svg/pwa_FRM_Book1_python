@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 let pyodideInstance = null
 let initializationPromise = null
-import { QUANTLIB_SHIM, PYMOO_SHIM, BASE_ENV_SETUP, PANDAS_DATAREADER_SHIM } from './python-shims'
+import { QUANTLIB_SHIM, PYMOO_SHIM, BASE_ENV_SETUP, PANDAS_DATAREADER_SHIM, SCIPY_RVS_SHIM } from './python-shims'
 
 const PYODIDE_CDNS = [
     'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js',
@@ -251,7 +251,8 @@ except: pass
                 pyodide.runPythonAsync(BASE_ENV_SETUP),
                 pyodide.runPythonAsync(PYMOO_SHIM),
                 pyodide.runPythonAsync(QUANTLIB_SHIM),
-                pyodide.runPythonAsync(PANDAS_DATAREADER_SHIM)
+                pyodide.runPythonAsync(PANDAS_DATAREADER_SHIM),
+                pyodide.runPythonAsync(SCIPY_RVS_SHIM)
             ]);
 
             smoother.update(99, '🛡️ 系統：權限校正與輸入掛鉤注入...')

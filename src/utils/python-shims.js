@@ -341,6 +341,46 @@ except Exception as e:
     print(f"⚠️ 模擬數據引擎啟動失敗: {str(e)}")
 `;
 
+export const SCIPY_RVS_SHIM = `
+# SciPy .rvs() 相容性墊片
+# 在 Pyodide 環境中，scipy.stats 的 .rvs() 方法可能因 _fblas 模組無法載入而失敗。
+# 此墊片攔截 ImportError，改用 numpy.random 提供等效的隨機取樣。
+try:
+    import scipy.stats as _scipy_stats
+    import numpy as _np
+    _orig_rvs = _scipy_stats.rv_generic.rvs
+
+    def _patched_rvs(self, *args, **kwargs):
+        try:
+            return _orig_rvs(self, *args, **kwargs)
+        except (ImportError, AttributeError) as _e:
+            if 'fblas' not in str(_e) and 'flapack' not in str(_e):
+                raise
+            # 取得分佈名稱
+            _name = getattr(self, 'name', getattr(getattr(self, 'dist', None), 'name', ''))
+            _size = kwargs.get('size', None)
+            _loc = kwargs.get('loc', 0)
+            _scale = kwargs.get('scale', 1)
+            _fallback_map = {
+                'bernoulli': lambda: _np.random.binomial(1, args[0] if args else kwargs.get('p', 0.5), size=_size),
+                'binom': lambda: _np.random.binomial(args[0] if args else kwargs.get('n', 1), args[1] if len(args) > 1 else kwargs.get('p', 0.5), size=_size),
+                'uniform': lambda: _np.random.uniform(_loc, _loc + _scale, size=_size),
+                'norm': lambda: _np.random.normal(_loc, _scale, size=_size),
+                'expon': lambda: _np.random.exponential(_scale, size=_size) + _loc,
+                'poisson': lambda: _np.random.poisson(args[0] if args else kwargs.get('mu', 1), size=_size),
+                'geom': lambda: _np.random.geometric(args[0] if args else kwargs.get('p', 0.5), size=_size),
+                'randint': lambda: _np.random.randint(args[0] if args else kwargs.get('low', 0), args[1] if len(args) > 1 else kwargs.get('high', 2), size=_size),
+            }
+            if _name in _fallback_map:
+                return _fallback_map[_name]()
+            raise
+
+    _scipy_stats.rv_generic.rvs = _patched_rvs
+    print("✅ SciPy 相容性：.rvs() 安全墊片已啟動。")
+except Exception:
+    pass
+`;
+
 export const BASE_ENV_SETUP = `
 import warnings
 # 忽略 DeprecationWarning 和 FutureWarning，保持 Console 乾淨

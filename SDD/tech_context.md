@@ -9,6 +9,7 @@
 - **建置工具**: **Vite 6.0** - 提供極速的 HMR 以及基於 Rollup 的生產環境優化。
 - **前端框架**: **React 18.3** - 採用併發模式 (Concurrent Mode) 與 Hooks (useState, useEffect, useMemo) 進行狀態管理。
 - **Python 引擎**: **Pyodide 0.26.4** - WebAssembly 版 Python 執行環境。
+  - **核心版本**: Python 3.12.7 (注意：此版本起 `distutils` 已被正式移除)。
   - **CDN 載入源**: `https://cdn.jsdelivr.net/pyodide/v0.26.4/full/` (或本地 `/public/lib/pyodide/`)
 - **編輯器**: **Monaco Editor 4.6** - 透過 `@monaco-editor/react` 封裝，實現高效能代碼編輯功能。
 
@@ -58,9 +59,22 @@
   - `Code modification`: 使用者自定義修改後的代碼暫存於 IndexedDB (`localforage` 實作)。
   - `Learning Progress`: 紀錄已讀章節與執行次數，儲存於 IndexedDB。
 
-## 3. Python 執行與整合策略
+## 3. Python 執行與相容性策略 (Runtime & Compatibility)
 
-### 3.1 Matplotlib 捕捉機制
+### 3.1 執行啟動與環境修補 (Shims)
+
+為了在瀏覽器環境中執行專為桌面端設計的 FRM 範例，系統實作了多層環境修補 (Shims)：
+
+1.  **`distutils` 相容性修補**: 
+    - **背景**: Python 3.12 移除了 `distutils`，但許多科學計算套件 (如 `QuantLib`) 仍依賴其進行版本檢查或路徑處理。
+    - **實作**: 在 `python-shims.js` 中實作了 `distutils` 虛擬模組，模擬了 `version`, `util`, `spawn` 等子模組，確保 legacy 代碼不崩潰。
+2.  **`pandas_datareader` 資料模擬 (CORS Bypass)**:
+    - **問題**: 瀏覽器受限於 CORS 政策，無法直接存取 Yahoo Finance 等外部 API。
+    - **解決方案**: 攔截 `DataReader` 調用，當偵測到目標為金融數據 (如 'AAPL', 'yahoo') 時，動態注入由 JavaScript 生成的合成數據 (Synthetic Data)，確保學習範例的繪圖與計算邏輯能完整走完。
+3.  **核心依賴預加載 (Unified Pre-loading)**:
+    - 針對具有複雜 C-extension 的套件 (`statsmodels`, `sympy`, `lxml`)，強制透過 Pyodide 的 `loadPackage` 二進制通路加載，而非 `micropip` 下載，以確保運行時的二進制一致性與穩定性。
+
+### 3.2 Matplotlib 捕捉機制
 
 - 實作自定義 Python 腳本插入：
   ```python
@@ -146,3 +160,4 @@
 - **性能**: 首次訪問加載時間 < 6s，二次訪問 (Service Worker 已啟動) < 1s。
 - **相容性**: 支援 WASM 的主流瀏覽器 (Chrome, Edge, Firefox, Safari)。
 - **安全性**: 所有動態渲染內容必須經過 DOMPurify 清理。
+- **透明度**: 實作了 **透明度診斷機制**。當 `ImportError` 發生時，系統會從 Python 堆疊中提取原始訊息 (如 `No module named 'interp2d'`) 並顯示給使用者，取代過往模糊的匯入錯誤提示。
