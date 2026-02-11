@@ -639,6 +639,15 @@ except ImportError:
 
 import numpy as np
 
+# Ensure Matplotlib uses a non-GUI backend and set a reliable default font
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib as mpl
+    mpl.rcParams['font.family'] = ['DejaVu Sans', 'sans-serif']
+except Exception:
+    pass
+
 try:
     import pandas as pd
 except ImportError:
