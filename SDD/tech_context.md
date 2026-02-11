@@ -9,7 +9,7 @@
 - **建置工具**: **Vite 6.0** - 提供極速的 HMR 以及基於 Rollup 的生產環境優化。
 - **前端框架**: **React 18.3** - 採用併發模式 (Concurrent Mode) 與 Hooks (useState, useEffect, useMemo) 進行狀態管理。
 - **Python 引擎**: **Pyodide 0.26.4** - WebAssembly 版 Python 執行環境。
-  - **CDN 載入源**: `https://cdn.jsdelivr.net/pyodide/v0.26.4/full/`
+  - **CDN 載入源**: `https://cdn.jsdelivr.net/pyodide/v0.26.4/full/` (或本地 `/public/lib/pyodide/`)
 - **編輯器**: **Monaco Editor 4.6** - 透過 `@monaco-editor/react` 封裝，實現高效能代碼編輯功能。
 
 ### 1.2 輔助函式庫與工具
@@ -21,7 +21,7 @@
   - `react-syntax-highlighter 16.1`: 代碼片段語法高亮。
 - **安全性與效能**:
   - `DOMPurify 3.3`: XSS 入侵過濾。
-  - `localforage 1.10`: IndexedDB 封裝，用於持久化儲存。
+  - `localforage 1.10`: IndexedDB 封裝，用於持久化儲存 (User Data)。
 - **PWA 支援**:
   - `vite-plugin-pwa 0.21`: 自動生成 Service Worker 與 Manifest。
   - `Workbox`: 執行時資源快取策略。
@@ -50,7 +50,7 @@
 2.  **Workbox Pre-caching**: 整合 `workbox-precaching`，將建置產物 (HTML, JS, CSS) 與關鍵 Python 套件 (`.whl`) 進行預快取，確保離線可用性。
 3.  **單一控制源**: 透過 `InjectManifest` 模式，將 COI 邏輯與 Workbox 邏輯合併於同一個 SW 實例中，避免了多個 Service Worker 爭奪頁面控制權導致的 Race Condition。
 
-### 2.2 資料流與本地儲存模式
+### 2.3 資料流與本地儲存模式
 
 - **唯讀資料**: `public/data/chapters.json` (由 `build-chapters.py` 生成)，應用啟動時一次性請求。
 - **使用者狀態**:
@@ -74,25 +74,28 @@
   ```
 - JS 端接收 Base64 字符串並渲染至 `<img>` 標籤。
 
-### 3.2 性能與啟動優化 (Detailed Optimization Logic)
+### 3.2 混合式加載架構 (Hybrid Loading Architecture) - [REFACTORED]
 
-- **並行預載入策略 (Parallel Pre-loading)**:
+本專案採用獨創的 **Hybrid Loading** 策略，結合序列化回報與持久化緩存，解決了 Python Wasm 應用「初次加載慢、無法回報進度」的痛點。
 
-  - 在 `pyodide-loader.js` 中利用 `Promise.all` **同時並行下載** 核心套件 (`numpy`, `pandas`, `matplotlib`, `scipy`)。
-  - **優點**: 充分利用瀏覽器並行下載能力，在寬頻網路下可顯著縮短等待時間。
-  - **代價**: 瞬間頻寬佔用較高。
-  - **效果**: 消除使用者執行第一個範例時的「冷啟動」延遲，提供即時運算體驗。
+#### 3.2.1 首次加載：序列化與進度回報 (Sequential Fetching)
+- **問題**: 傳統 `micropip.install([list])` 或 `Promise.all` 會導致所有下載請求同時發出，頻寬競爭下無法精確計算進度，且使用者需面對長時間的靜止畫面。
+- **解決方案**: 
+    - 採用 **Recursive Sequence** 模式，依序下載核心套件 (`numpy` -> `pandas` -> `matplotlib` -> `scipy`)。
+    - 每完成一個套件下載，即時更新 `LoadStatus`，讓使用者看到具體的「正在安裝 Numpy... (30%)」反饋，大幅降低等待焦慮。
 
-- **Shim 代碼模組化 (Modularized Shims)**:
-  - 將龐大的相容性代碼 (QuantLib Mock, Pymoo Shim) 提取至 `src/utils/python-shims.js`。
-  - 減少 `pyodide-loader.js` 的體積，並允許未來實作按需載入 (Lazy Evaluation)。
+#### 3.2.2 二次加載：IDBFS 持久化與極速啟動 (Persistence & Warm Start)
+- **機制**: 利用 Emscripten 的 `IDBFS` 文件系統，將 Pyodide 的 `/lib/python3.11/site-packages` 掛載至瀏覽器的 IndexedDB。
+- **流程**:
+    1. **掛載 (Mount)**: 啟動時檢查 IDB 是否存在已安裝的套件快照。
+    2. **同步 (Sync)**: 若存在，直接將 IDB 內容映射至記憶體文件系統 (MemoryFS)，跳過網路下載。
+    3. **衝刺 (Sprint)**: 進度條以視覺化的「衝刺動畫」在 500ms 內跑完，達成 **Instant Warm Start (< 1.5s)** 的體驗。
+- **一致性**: 透過 `package.json` 版本號比對，若核心依賴變更，會自動清除 IDB 緩存並觸發重新下載。
 
-- **三層依賴檢查機制 (Triple-Layer Dependency Guard)**:
-
-  1. **硬排除 (Hard- **標準庫排除清單**: 在 `ensureDependencies` 中明確排除 `time`, `random`, `csv`, `copy`, `os`, `sys` 等內建標準庫，防止 `micropip` 誤抓取導致的 `ValueError`。
-這些是編譯於 Python Wasm 核心中的內建模組，聯網安裝會導致 `ValueError`。
-  2. **核心緩存 (Core Cache)**: `coreLibs`（如 `pandas`, `scipy`）在初始化時已載入，直接標記為已安裝。
-  3. **動態緩存 (Dynamic Cache)**: 使用 `installedPackages` (Set) 紀錄運行期間動態下載的套件。每次執行前會掃描 `import` 語句，僅對「非標準庫、非核心庫、且尚未安裝」的套件調用聯網下載，極大化執行效率。
+#### 3.2.3 三層依賴檢查機制 (Triple-Layer Dependency Guard)
+1. **硬排除 (Hard Exclusion)**: 明確排除 `time`, `random`, `os` 等 Python 標準庫，防止 `micropip` 誤判。
+2. **核心鎖定 (Core Lock)**: 啟動時鎖定核心科學套件版本，確保環境一致性。
+3. **動態緩存 (Dynamic Cache)**: 執行期間動態引入的第三方套件 (非核心庫)，也會被同步寫入 IDB，實現「越用越快」的特性。
 
 ### 3.3 交互與穩定性模式 (UX Stability Patterns)
 

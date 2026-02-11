@@ -52,6 +52,7 @@ function App() {
   const [chaptersLoading, setChaptersLoading] = useState(true)
   const [currentChapter, setCurrentChapter] = useState(null)
   const [currentScript, setCurrentScript] = useState(null)
+  const [selectedTopicId, setSelectedTopicId] = useState('')
 
   const [output, setOutput] = useState('')
   const [plotImages, setPlotImages] = useState([])
@@ -59,10 +60,10 @@ function App() {
   const [isInteractive, setIsInteractive] = useState(false)
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('theme')
-    return saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    return saved === 'dark' || (!saved && false) // Default to Light Mode (false)
   })
 
-  const [previewPanelWidth, setPreviewPanelWidth] = useState(500)
+  const [previewPanelWidth, setPreviewPanelWidth] = useState(600) // Start visible and centered
   const [installedPackages] = useState(new Set())
   const [currentMplBackend, setCurrentMplBackend] = useState(null)
 
@@ -304,6 +305,7 @@ sys.stdout = StringIO()
   const handleChapterSelect = (chapter) => {
     setCurrentChapter(chapter)
     setCurrentScript(null)
+    setSelectedTopicId('') // Reset topic when chapter changes
     setOutput('')
     setPlotImages([])
 
@@ -332,29 +334,10 @@ sys.stdout = StringIO()
     setPlotImages([])
   }
 
-  if (loading) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-content">
-          <div className="loading-spinner"></div>
-          <h2>正在載入 Python 執行環境...</h2>
-          <div className="progress-container">
-            <div
-              className="progress-bar"
-              style={{ width: `${loadingProgress}%` }}
-            ></div>
-          </div>
-          <p className="loading-text">{loadingMessage} ({loadingProgress}%)</p>
-          <p className="loading-hint">首次載入需要下載約 10MB 的資源，請稍候</p>
-        </div>
-      </div>
-    )
-  }
+  const isLoadingEnvironment = loading;
 
   return (
     <div className={`app ${darkMode ? 'dark' : ''}`}>
-      {/* Sidebar removed */}
-
       <div className="main-content">
         <div className="top-bar">
           <div className="top-bar-left">
@@ -368,6 +351,8 @@ sys.stdout = StringIO()
             onChapterSelect={handleChapterSelect}
             currentScript={currentScript}
             onScriptSelect={handleScriptSelect}
+            selectedTopicId={selectedTopicId}
+            onTopicSelect={setSelectedTopicId}
             loading={chaptersLoading}
           />
 
@@ -382,11 +367,35 @@ sys.stdout = StringIO()
           </div>
         </div>
 
+
+
+        {/* Premium Hydration Dashboard (Center Overlay) */}
+        {isLoadingEnvironment && (
+          <div className="hydration-overlay">
+            <div className="hydration-card">
+              <div className="hydration-header">
+                <div className="hydration-title">FRM Python 引擎啟動中</div>
+                <div className="hydration-subtitle">Financial Risk Management</div>
+              </div>
+
+              <div className="hydration-progress-container">
+                <div className="hydration-progress-bar" style={{ width: `${loadingProgress}%` }}></div>
+              </div>
+
+              <div className="hydration-status">
+                <span>{loadingMessage}</span>
+                <span>{loadingProgress}%</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="panes-container">
           <div className="content-pane">
             <ContentPanel
               chapter={currentChapter}
               onCodeClick={handleCodeClick}
+              selectedTopicId={selectedTopicId}
               darkMode={darkMode}
               output={output}
               isRunning={isRunning}
@@ -406,6 +415,7 @@ sys.stdout = StringIO()
                   onClose={handleClosePreview}
                   onRun={handleRunCode}
                   isRunning={isRunning}
+                  isLoading={loading}
                   output={output}
                   images={plotImages}
                   isInteractive={isInteractive}

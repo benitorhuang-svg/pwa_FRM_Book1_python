@@ -10,6 +10,7 @@ export default [
             'dist/**',
             'public/coi-serviceworker.js',
             'src/coi-serviceworker.js',
+            'public/lib/**',
         ],
     },
     js.configs.recommended,
