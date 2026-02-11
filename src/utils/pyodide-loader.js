@@ -114,9 +114,9 @@ export async function loadPyodide(onProgress) {
 
             // Check what's already installed to avoid redundant downloads
             // Core Pyodide distribution packages
-            const corePackages = ['numpy', 'pandas', 'matplotlib', 'scipy', 'seaborn', 'micropip'];
+            const corePackages = ['numpy', 'pandas', 'matplotlib', 'scipy', 'seaborn', 'statsmodels', 'sympy', 'micropip'];
             // Third-party packages (not in distribution)
-            const pipPackages = ['numpy-financial', 'pandas-datareader', 'pyodide-http'];
+            const pipPackages = ['numpy-financial', 'pandas-datareader', 'pyodide-http', 'pymoo==0.4.1'];
             const installedFiles = pyodide.FS.readdir(SITE_PACKAGES);
 
             const coreToLoad = corePackages.filter(pkg => {
