@@ -3,6 +3,39 @@ let pyodideInstance = null
 let initializationPromise = null
 import { QUANTLIB_SHIM, PYMOO_SHIM, BASE_ENV_SETUP, PANDAS_DATAREADER_SHIM } from './python-shims'
 
+const PYODIDE_CDNS = [
+    'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js',
+    'https://unpkg.com/pyodide@0.26.4/pyodide.js',
+];
+
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.crossOrigin = 'anonymous';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+        document.head.appendChild(script);
+    });
+}
+
+async function ensurePyodideScript() {
+    if (typeof window.loadPyodide === 'function') return;
+    console.warn('window.loadPyodide not found, loading dynamically...');
+    for (const cdn of PYODIDE_CDNS) {
+        try {
+            await loadScript(cdn);
+            if (typeof window.loadPyodide === 'function') {
+                console.log(`Pyodide loaded from ${cdn}`);
+                return;
+            }
+        } catch (e) {
+            console.warn(`Failed to load Pyodide from ${cdn}:`, e.message);
+        }
+    }
+    throw new Error('Failed to load Pyodide from all CDN sources');
+}
+
 class SmoothProgress {
     constructor(onProgress) {
         this.onProgress = onProgress;
@@ -69,6 +102,9 @@ export async function loadPyodide(onProgress) {
 
         try {
             smoother.update(10, '正在啟動 Python 直譯器 (v0.26.4)...');
+
+            // Ensure window.loadPyodide is available (dynamically load if needed)
+            await ensurePyodideScript();
 
             // Retry logic for loading Pyodide
             let pyodide = null;
