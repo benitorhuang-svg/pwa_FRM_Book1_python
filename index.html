@@ -16,6 +16,32 @@
   <link rel="apple-touch-icon" href="icons/icon-192x192.png" />
   <title>pwa_基礎篇_手術刀般精準的FRM用Python科學管控財金風險</title>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js" crossorigin="anonymous"></script>
+  <!-- Inline minimal SciPy stub to ensure safe imports before app code runs -->
+  <script id="inline-scipy-stub" type="text/plain">
+import types, sys
+import numpy as np
+
+scipy = types.ModuleType('scipy')
+stats = types.ModuleType('scipy.stats')
+linalg = types.ModuleType('scipy.linalg')
+
+def _noop(*args, **kwargs):
+    return None
+
+stats.bernoulli = lambda p=0.5: types.SimpleNamespace(name='bernoulli', rvs=lambda size=None, **k: np.random.binomial(1, p, size=size))
+stats.uniform = lambda loc=0, scale=1: types.SimpleNamespace(name='uniform', rvs=lambda size=None, **k: np.random.uniform(loc, loc+scale, size=size))
+
+linalg.pascal = lambda n: (np.tril(np.fromfunction(lambda i,j: np.vectorize(lambda a,b: __import__('math').comb(max(a,b), min(a,b)))(i,j), (n,n), dtype=int)))
+linalg.eig = lambda A: np.linalg.eig(np.array(A))
+linalg.inv = lambda A: np.linalg.inv(np.array(A))
+linalg.solve = lambda a,b: np.linalg.solve(np.array(a), np.array(b))
+
+scipy.stats = stats
+scipy.linalg = linalg
+sys.modules['scipy'] = scipy
+sys.modules['scipy.stats'] = stats
+sys.modules['scipy.linalg'] = linalg
+  </script>
 </head>
 
 <body>

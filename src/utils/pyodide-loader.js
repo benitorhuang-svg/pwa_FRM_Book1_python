@@ -125,6 +125,21 @@ export async function loadPyodide(onProgress) {
                 }
             }
 
+            // Execute any inline stub embedded in index.html before other setup
+            try {
+                const stubEl = document.getElementById('inline-scipy-stub');
+                if (stubEl && stubEl.textContent && stubEl.textContent.trim().length > 0) {
+                    try {
+                        await window.pyodide.runPythonAsync(stubEl.textContent);
+                        console.log('Inline SciPy stub executed early.');
+                    } catch (innerErr) {
+                        console.warn('Failed to execute inline SciPy stub:', innerErr);
+                    }
+                }
+            } catch (err) {
+                console.warn('Error checking inline SciPy stub:', err);
+            }
+
             smoother.update(25, '引擎啟動完成，正在檢查本地暫存環境...')
             await smoother.yieldToUI();
 

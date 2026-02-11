@@ -119,3 +119,45 @@
 - **響應式佈局**：在行動裝置上，代碼編輯區與輸出區應能通過滑動或分頁標籤輕鬆切換。
 - **安全性**：使用 DOMPurify 對輸出的 HTML/Markdown 進行 XSS 過濾，並針對 KaTeX 渲染生成的 MathML 與 SVG 標籤進行精確加白名單處理。
 - **數學公式渲染**：整合 `marked-katex-extension`，自動識別 Markdown 中的 TeX 公式（支援 `$ ... $` 行內公式與 `$$ ... $$` 獨立區塊公式），確保金融模型的數學推導能以印刷品質顯示。
+
+## 附錄 A：最近實作變更摘要（重要）
+
+為了解決在瀏覽器中以 Pyodide 運行 SciPy 時遇到的本機 C 擴充匯入錯誤（例如："dynamic module does not define module export function (PyInit__fblas)"），專案在啟動階段與執行環境層面加入多項相容性修補與部署最佳化。以下為已完成的具體變更：
+
+- `SCIPY_STUB`（位於 `src/utils/python-shims.js`）：
+  - 注入一個純 Python 的 `scipy` 與子模組 `scipy.stats`、`scipy.linalg` 的最小 stub，提供常用分佈（`norm`, `bernoulli`, `binom`, `uniform`, `beta`, `gamma`, `poisson`, `geom`, `randint` 等）與常見線性代數函式（`pascal`, `ldl`, `eig`, `inv`, `solve`）的純 Python 替代實作或封裝。
+  - 目的：在無法載入 SciPy 原生擴充的瀏覽器環境下仍能讓書中範例以降級方式執行（以 NumPy 為後端），避免 ImportError 使整個頁面中斷。
+
+- `SCIPY_RVS_SHIM`：
+  - 為 SciPy 的 `rv_generic.rvs` 提供運行時 fallback，當原生 `.rvs()` 嘗試觸發編譯模組而失敗時，自動呼叫 `numpy.random` 等價生成器。
+
+- `BASE_ENV_SETUP`：
+  - 在 Pyodide 啟動時強制 Matplotlib 使用非 GUI 後端 `Agg`，並將預設字型設定為 `DejaVu Sans`，以消除 `findfont` / GUI backend 的重複警告，並確保圖像可被渲染並儲存為檔案或轉為 canvas。
+
+- Inline SciPy stub（在 `index.html`）與早期註冊：
+  - 為防止在應用的 shim 還沒注入前，頁面其他腳本嘗試 `import scipy` 導致加載原生擴充，新增一個極小的 inline stub（載入於 `index.html`，ID=`inline-scipy-stub`）並由 `pyodide-loader.js` 在 Pyodide 初始化後立即執行，確保 `sys.modules['scipy']` 在任何範例程式執行前已存在。
+
+- 自動清理 Service Worker / Cache 的客戶端腳本（`src/utils/auto_clear_sw.js` + `src/main.jsx` 呼叫）：
+  - 在客戶端檢測到頁面仍被舊 Service Worker 控制時，自動嘗試解除註冊 SW、刪除 Cache Storage、刪除常見 IndexedDB 名稱與清空 local/sessionStorage，並重新載入頁面以確保使用者載入最新資源。此動作設為一次性（以 localStorage flag 標記）。
+
+- `pyodide-loader.js` 的啟動順序調整：
+  - 在載入 Pyodide 並建立執行環境後，立刻執行 inline stub、接著注入並執行 `SCIPY_STUB`、`BASE_ENV_SETUP`、`PYMOO_SHIM`、`QUANTLIB_SHIM`、`PANDAS_DATAREADER_SHIM` 與 `SCIPY_RVS_SHIM` 等補丁；並在 `FS.syncfs` 後持久化 site-packages 至 IDBFS。
+
+- 部署流程補強：
+  - 重建 (`npm run build`) 並使用 `npx gh-pages -d dist` 發佈至 GitHub Pages，確保 `dist/wheels/` 與嵌入的 shim 在生產環境可用。
+
+重要測試與驗證指引：
+- 清理快取（必要）：在測試最新版時，請務必在瀏覽器執行以下步驟以避免舊 Service Worker 或快取導致的舊資源被載入：
+  1. DevTools → Application → Service Workers → Unregister。
+  2. DevTools → Application → Clear storage → 勾選所有項目並按 Clear site data。
+  3. DevTools → Network → 勾選 Disable cache，然後做硬重新整理（Ctrl/Cmd + Shift + R）。
+
+- 錯誤蒐集：若再次遇到 `PyInit__fblas` 相關錯誤，請擷取並附上：
+  - Console 中第一次出現的完整錯誤堆疊（含引發位置）。
+  - Network 面板中同時間段所有失敗資源的請求（尤其 `pyodide.js`、任何 `.wasm`、或載入 `.so` 的請求）。
+
+設計備註與風險：
+- 此類 fallback/stub 採「漸進式降級」策略——在不能提供 SciPy 原生性能時以 NumPy 與純 Python 實作保證範例邏輯可執行；但在數值精度或效能上可能與原生 SciPy 有差異，對於需要高效能 BLAS/LAPACK 運算的範例仍建議在本地完整 Python 環境執行。
+- 自動清理機制較為激進，會清除使用者的 localStorage/IndexedDB；此策略的好處是能快速修復被舊 SW/快取影響的使用者，但可能影響本地未備份的使用者資料。如需降低侵入性，建議改為顯示「清除快取並重新載入」的提示，交由使用者手動確認。
+
+若需要，我可以把上述變更整理成一份小型「變更日誌（CHANGELOG）」並新增到專案根目錄，或把 `SDD/tech_context.md` 補入更詳細的技術執行步驟與代碼位置註記。請告訴我你要哪一個。 
