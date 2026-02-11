@@ -132,6 +132,20 @@ export function formatPythonError(error) {
 • 檢查資料中是否有零值`
     },
     {
+      pattern: /ImportError: (.+)/,
+      format: (match) => `❌ 匯入錯誤：${match[1]}
+
+💡 可能的原因：
+• 模組內部代碼執行出錯
+• 該模組的某些子功能不支援瀏覽器環境
+• 循環引用或其他內部相容性問題
+
+🔧 建議：
+• 檢查模組名稱是否正確
+• 某些 C 擴展模組在瀏覽器中受限
+• 點擊「查看詳情」了解完整錯誤堆棧`
+    },
+    {
       pattern: /ImportError/,
       format: () => `❌ 匯入錯誤
 

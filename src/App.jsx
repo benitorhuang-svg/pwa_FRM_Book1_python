@@ -25,8 +25,8 @@ const MODULE_MAPPING = {
   'pymoo': 'wheels/pymoo-0.4.1-py3-none-any.whl',
   'pandas_datareader': 'wheels/pandas_datareader-0.10.0-py3-none-any.whl',
   'pyodide_http': 'wheels/pyodide_http-0.2.2-py3-none-any.whl',
-  'mpl_toolkits': 'matplotlib', // mpl_toolkits is part of matplotlib
-  'pylab': 'matplotlib' // pylab is part of matplotlib
+  'mpl_toolkits': 'matplotlib',
+  'pylab': 'matplotlib'
 }
 
 // Dependencies for local wheels
@@ -159,7 +159,7 @@ function App() {
     if (!imports) return
 
     const stdLibs = ['sys', 'os', 'io', 'time', 'base64', 'json', 'datetime', 'math', 're', 'warnings', 'builtins', 'types', 'random', 'csv', 'copy', 'collections', 'itertools', 'functools', 'pathlib']
-    const coreLibs = ['numpy', 'pandas', 'matplotlib', 'scipy', 'micropip', 'js', 'builtins', 'QuantLib']
+    const coreLibs = ['numpy', 'pandas', 'matplotlib', 'scipy', 'statsmodels', 'sympy', 'lxml', 'micropip', 'js', 'builtins', 'QuantLib']
 
     const neededModules = [...new Set(imports.map(line => {
       const parts = line.trim().split(/\s+/)
