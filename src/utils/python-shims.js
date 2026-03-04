@@ -645,6 +645,41 @@ class _GeomF:
         p = self.p; q = 1 - p
         return _select_moments(1.0/p, q/p**2, (2-p)/max(math.sqrt(q),1e-30), 6+p**2/max(q,1e-30), moments)
 
+class _NbinomF:
+    _name = 'nbinom'
+    def __init__(self, n, p):
+        self.n = float(n); self.p = float(p)
+    def pmf(self, k):
+        k = np.atleast_1d(np.asarray(k, dtype=int)); n = self.n; p = self.p
+        def _nb(ki):
+            if ki < 0: return 0.0
+            return math.exp(math.lgamma(ki + n) - math.lgamma(ki + 1) - math.lgamma(n)
+                            + n * math.log(max(p, 1e-300)) + ki * math.log(max(1 - p, 1e-300)))
+        r = np.array([_nb(int(ki)) for ki in k.flat]).reshape(k.shape)
+        return float(r) if r.size == 1 else r
+    def cdf(self, k):
+        k = np.atleast_1d(np.asarray(k, dtype=int))
+        r = np.array([sum(float(self.pmf(j)) for j in range(max(0, int(ki)) + 1)) for ki in k.flat]).reshape(k.shape)
+        return float(r) if r.size == 1 else r
+    def ppf(self, q):
+        q = np.atleast_1d(np.asarray(q, dtype=float))
+        def _sc(qi):
+            c = 0.0
+            for j in range(int(self.n / max(self.p, 1e-30) * 10) + 200):
+                c += float(self.pmf(j))
+                if c >= qi: return j
+            return j
+        r = np.array([_sc(float(qi)) for qi in q.flat]).reshape(q.shape)
+        return int(r) if r.size == 1 else r
+    def rvs(self, size=None):
+        return np.random.negative_binomial(self.n, self.p, size=size)
+    def stats(self, moments='mvsk'):
+        n, p = self.n, self.p; q = 1 - p
+        m = n * q / max(p, 1e-30); v = n * q / max(p**2, 1e-30)
+        s = (1 + q) / max(math.sqrt(n * q), 1e-30)
+        kk = 6.0 / n + p**2 / max(n * q, 1e-30)
+        return _select_moments(m, v, s, kk, moments)
+
 class _UniformF:
     _name = 'uniform'
     def __init__(self, loc=0.0, scale=1.0):
@@ -933,6 +968,7 @@ _stats.bernoulli = _make_gen(_BernoulliF, 'bernoulli')
 _stats.binom = _make_gen(_BinomF, 'binom')
 _stats.poisson = _make_gen(_PoissonF, 'poisson')
 _stats.geom = _make_gen(_GeomF, 'geom')
+_stats.nbinom = _make_gen(_NbinomF, 'nbinom')
 _stats.uniform = _make_gen(_UniformF, 'uniform')
 _stats.expon = _make_gen(_ExponF, 'expon')
 _stats.beta = _make_gen(_BetaF, 'beta')
