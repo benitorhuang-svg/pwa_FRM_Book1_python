@@ -60,12 +60,12 @@ import './App.css'
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   (async () => {
     try {
-      const assetsUrl = `${import.meta.env.BASE_URL}assets-manifest.json?t=${Date.now()}`
-      const fallbackUrl = `${import.meta.env.BASE_URL}manifest.webmanifest?t=${Date.now()}`
+      const primaryUrl = `${import.meta.env.BASE_URL}manifest.webmanifest?t=${Date.now()}`
+      const fallbackUrl = `${import.meta.env.BASE_URL}assets-manifest.json?t=${Date.now()}`
       let manifestText = null
 
       try {
-        const ar = await fetch(assetsUrl, { cache: 'no-store' })
+        const ar = await fetch(primaryUrl, { cache: 'no-store' })
         if (ar && ar.ok) {
           manifestText = await ar.text()
         }

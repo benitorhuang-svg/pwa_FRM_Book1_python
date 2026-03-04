@@ -130,7 +130,7 @@ export async function loadPyodide(onProgress) {
                 const stubEl = document.getElementById('inline-scipy-stub');
                 if (stubEl && stubEl.textContent && stubEl.textContent.trim().length > 0) {
                     try {
-                        await window.pyodide.runPythonAsync(stubEl.textContent);
+                        await pyodide.runPythonAsync(stubEl.textContent);
                         console.log('Inline SciPy stub executed early.');
                     } catch (innerErr) {
                         console.warn('Failed to execute inline SciPy stub:', innerErr);
@@ -370,26 +370,8 @@ export async function loadChapterDatasets(pyodide, chapterId) {
     if (_loadedChapterDatasets.has(chapterId)) return;
 
     try {
-        // future work: download and extract dataset archive if present
-        const url = `${import.meta.env.BASE_URL}data/datasets/${chapterId}.zip`;
-        const resp = await fetch(url);
-        if (resp.ok) {
-            console.log(`found dataset archive for ${chapterId}`);
-            // attempt unzip if JSZip is available
-            if (window.JSZip) {
-                const buf = await resp.arrayBuffer();
-                const zip = await window.JSZip.loadAsync(buf);
-                await Promise.all(
-                    Object.keys(zip.files).map(async fname => {
-                        const data = await zip.files[fname].async('uint8array');
-                        pyodide.FS.writeFile(fname, data);
-                    })
-                );
-                console.log(`datasets for ${chapterId} extracted to FS`);
-            } else {
-                console.warn('JSZip not available, cannot unzip datasets');
-            }
-        }
+        // No external chapter dataset archives are shipped in this project now.
+        // Keep the hook as a silent no-op to avoid unnecessary 404 noise.
     } catch (e) {
         console.warn('loadChapterDatasets error', e);
     } finally {
