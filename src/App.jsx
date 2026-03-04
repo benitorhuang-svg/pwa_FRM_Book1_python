@@ -619,8 +619,11 @@ sys.stdout = StringIO()
             />
           </div>
 
-          {currentScript && (
-            <div className="preview-pane" style={{ width: `${previewPanelWidth}px` }}>
+          <div
+            className={`preview-pane${currentScript ? '' : ' preview-pane--hidden'}`}
+            style={{ width: currentScript ? `${previewPanelWidth}px` : 0 }}
+          >
+            {currentScript && (
               <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#888' }}>Loading Editor...</div>}>
                 <CodePreviewPanel
                   script={currentScript}
@@ -636,8 +639,8 @@ sys.stdout = StringIO()
                   onResize={setPreviewPanelWidth}
                 />
               </Suspense>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 

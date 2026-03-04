@@ -714,4 +714,12 @@
   overflow: visible;
   position: relative;
   z-index: 50;
+  flex-shrink: 0;
+  transition: width 0.25s ease;
+}
+
+.preview-pane--hidden {
+  width: 0 !important;
+  overflow: hidden;
+  pointer-events: none;
 }

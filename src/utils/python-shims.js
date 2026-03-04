@@ -830,9 +830,11 @@ class _FF:
         z = (x - self.loc) / self.scale
         def _p(zi):
             if zi <= 0: return 0.0
-            num = (d1*zi)**d1 * d2**d2 / (d1*zi + d2)**(d1+d2)
-            lb = math.lgamma(d1/2) + math.lgamma(d2/2) - math.lgamma((d1+d2)/2)
-            return math.sqrt(max(num, 0)) / (zi * math.exp(lb)) / self.scale
+            # Use log-space to avoid overflow for large d1,d2
+            log_num = (d1/2)*math.log(d1) + (d2/2)*math.log(d2) + (d1/2 - 1)*math.log(zi) \
+                      - ((d1+d2)/2)*math.log(d1*zi + d2)
+            log_beta = math.lgamma(d1/2) + math.lgamma(d2/2) - math.lgamma((d1+d2)/2)
+            return math.exp(log_num - log_beta) / self.scale
         r = np.vectorize(_p)(z)
         return float(r) if np.ndim(r) == 0 else r
     def logpdf(self, x):
@@ -941,9 +943,55 @@ _stats.f = _make_gen(_FF, 'f')
 _stats.lognorm = _make_gen(_LognormF, 'lognorm')
 _stats.randint = _make_gen(_RandintF, 'randint')
 
+# ── scipy.stats standalone functions ──────────────────────
+def _ttest_ind(a, b, equal_var=True, **kw):
+    a = np.asarray(a, dtype=float); b = np.asarray(b, dtype=float)
+    n1, n2 = len(a), len(b)
+    m1, m2 = np.mean(a), np.mean(b)
+    v1, v2 = np.var(a, ddof=1), np.var(b, ddof=1)
+    if equal_var:
+        sp2 = ((n1 - 1) * v1 + (n2 - 1) * v2) / (n1 + n2 - 2)
+        t_stat = (m1 - m2) / math.sqrt(sp2 * (1.0/n1 + 1.0/n2))
+        df = n1 + n2 - 2
+    else:
+        se = math.sqrt(v1/n1 + v2/n2)
+        t_stat = (m1 - m2) / se if se > 0 else 0.0
+        num = (v1/n1 + v2/n2)**2
+        den = (v1/n1)**2/(n1-1) + (v2/n2)**2/(n2-1) if (n1>1 and n2>1) else 1.0
+        df = num / den if den > 0 else 1.0
+    # two-sided p-value via t distribution cdf
+    t_dist = _TF(df)
+    p = 2.0 * (1.0 - t_dist.cdf(abs(t_stat)))
+    class _TtestResult:
+        def __init__(self, stat, pval):
+            self.statistic = stat; self.pvalue = pval
+        def __repr__(self):
+            return f'Ttest_indResult(statistic={self.statistic}, pvalue={self.pvalue})'
+        def __iter__(self):
+            return iter((self.statistic, self.pvalue))
+    return _TtestResult(t_stat, p)
+
+def _binom_test_fn(x, n=None, p=0.5, alternative='two-sided'):
+    if n is None: n = x
+    from math import comb as _comb
+    pmf_obs = _comb(n, x) * p**x * (1-p)**(n-x)
+    if alternative == 'two-sided':
+        pval = 0.0
+        for k in range(n + 1):
+            pk = _comb(n, k) * p**k * (1-p)**(n-k)
+            if pk <= pmf_obs + 1e-15: pval += pk
+        return min(pval, 1.0)
+    elif alternative == 'less':
+        return sum(_comb(n, k) * p**k * (1-p)**(n-k) for k in range(x + 1))
+    else:
+        return sum(_comb(n, k) * p**k * (1-p)**(n-k) for k in range(x, n + 1))
+
+_stats.ttest_ind = _ttest_ind
+_stats.binom_test = _binom_test_fn
+
 _scipy_mod.stats = _stats
 sys.modules['scipy.stats'] = _stats
-print('✅ SciPy.stats: 14 distributions installed (pure-Python, _fblas-free).')
+print('✅ SciPy.stats: 14 distributions + ttest_ind + binom_test installed.')
 
 # ── scipy.linalg ─────────────────────────────────────────
 try:
@@ -993,17 +1041,32 @@ except Exception:
         x = np.array(x0, dtype=float).copy(); n = len(x)
         maxiter = (options or {}).get('maxiter', 2000 * n)
         tol = (options or {}).get('ftol', 1e-10)
+        # Convert _Bounds object to list of (lo, hi) tuples
+        _bnds = None
+        if bounds is not None:
+            if hasattr(bounds, 'lb'):
+                _bnds = list(zip(bounds.lb, bounds.ub))
+            else:
+                _bnds = list(bounds)
         def _pen(xv):
             v = float(fun(xv, *args) if args else fun(xv))
-            if bounds:
-                for i, (lo, hi) in enumerate(bounds):
+            if _bnds:
+                for i, (lo, hi) in enumerate(_bnds):
                     if lo is not None and xv[i] < lo: v += 1e8 * (lo - xv[i])**2
                     if hi is not None and xv[i] > hi: v += 1e8 * (xv[i] - hi)**2
             c_list = [constraints] if isinstance(constraints, dict) else list(constraints)
             for c in c_list:
-                cv = float(c['fun'](xv))
-                if c.get('type') == 'eq': v += 1e8 * cv**2
-                elif c.get('type') == 'ineq' and cv < 0: v += 1e8 * cv**2
+                # Handle both dict constraints and LinearConstraint objects
+                if hasattr(c, 'A'):
+                    Ax = np.dot(np.atleast_2d(c.A), xv)
+                    lb = np.atleast_1d(c.lb); ub = np.atleast_1d(c.ub)
+                    for j in range(len(Ax)):
+                        if Ax[j] < lb[j]: v += 1e8 * (lb[j] - Ax[j])**2
+                        if Ax[j] > ub[j]: v += 1e8 * (Ax[j] - ub[j])**2
+                else:
+                    cv = float(c['fun'](xv))
+                    if c.get('type') == 'eq': v += 1e8 * cv**2
+                    elif c.get('type') == 'ineq' and cv < 0: v += 1e8 * cv**2
             return v
         simplex = [x.copy()]
         for i in range(n):
@@ -1100,6 +1163,83 @@ except Exception:
     _scipy_mod.interpolate = _interp
     sys.modules['scipy.interpolate'] = _interp
     print('✅ SciPy.interpolate: stub installed (numpy interp backend).')
+
+# ── scipy.integrate ──────────────────────────────────────
+try:
+    from scipy import integrate as _native_integrate
+    _native_integrate.quad
+except Exception:
+    _integrate = types.ModuleType('scipy.integrate')
+    def _quad(func, a, b, args=(), limit=50, **kw):
+        # Adaptive Simpson's rule
+        n = min(max(limit * 4, 200), 2000)
+        if a == float('-inf') and b == float('inf'):
+            # substitution t = x/(1-x^2)
+            def _g(t):
+                if abs(t) >= 1.0: return 0.0
+                x = t / (1 - t*t); dx = (1 + t*t) / (1 - t*t)**2
+                return func(x, *args) * dx
+            return _quad(_g, -0.999, 0.999, args=(), limit=limit)
+        elif a == float('-inf'):
+            def _g(t):
+                if t <= 0: return 0.0
+                x = b - (1 - t) / t; dx = 1.0 / (t*t)
+                return func(x, *args) * dx
+            return _quad(_g, 1e-10, 1.0, args=(), limit=limit)
+        elif b == float('inf'):
+            def _g(t):
+                if t <= 0: return 0.0
+                x = a + (1 - t) / t; dx = 1.0 / (t*t)
+                return func(x, *args) * dx
+            return _quad(_g, 1e-10, 1.0, args=(), limit=limit)
+        h = (b - a) / n
+        xs = [a + i * h for i in range(n + 1)]
+        ys = [func(xi, *args) for xi in xs]
+        # Simpson's composite rule
+        s = ys[0] + ys[-1]
+        for i in range(1, n, 2): s += 4 * ys[i]
+        for i in range(2, n, 2): s += 2 * ys[i]
+        result = s * h / 3.0
+        err = abs(result) * 1e-8
+        return (result, err)
+    _integrate.quad = _quad
+    _scipy_mod.integrate = _integrate
+    sys.modules['scipy.integrate'] = _integrate
+    print('✅ SciPy.integrate: stub installed (Simpson rule).')
+
+# ── scipy.special (minimal stub) ─────────────────────────
+try:
+    from scipy import special as _native_special
+    _native_special.comb
+except Exception:
+    _special = types.ModuleType('scipy.special')
+    _special.comb = lambda n, k, exact=False: float(math.comb(int(n), int(k)))
+    _special.factorial = lambda n, exact=False: float(math.factorial(int(n)))
+    _special.gamma = lambda x: math.gamma(float(x))
+    _special.gammaln = lambda x: math.lgamma(float(x))
+    _special.beta = lambda a, b: math.exp(math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b))
+    _special.erf = lambda x: math.erf(float(x))
+    _special.erfc = lambda x: math.erfc(float(x))
+    _special.ndtr = lambda x: 0.5 * (1.0 + math.erf(float(x) / math.sqrt(2.0)))
+    _special.ndtri = lambda p: _ppf_bisect(_norm_cdf_scalar, float(p))
+    _scipy_mod.special = _special
+    sys.modules['scipy.special'] = _special
+    print('✅ SciPy.special: stub installed (gamma, erf, comb, factorial).')
+
+# ── scipy.spatial (minimal stub) ─────────────────────────
+try:
+    from scipy import spatial as _native_spatial
+    _native_spatial.distance
+except Exception:
+    _spatial = types.ModuleType('scipy.spatial')
+    _spatial_distance = types.ModuleType('scipy.spatial.distance')
+    _spatial_distance.euclidean = lambda u, v: float(np.linalg.norm(np.asarray(u) - np.asarray(v)))
+    _spatial_distance.cdist = lambda XA, XB, metric='euclidean': np.sqrt(np.sum((np.asarray(XA)[:, None, :] - np.asarray(XB)[None, :, :])**2, axis=-1))
+    _spatial.distance = _spatial_distance
+    sys.modules['scipy.spatial'] = _spatial
+    sys.modules['scipy.spatial.distance'] = _spatial_distance
+    _scipy_mod.spatial = _spatial
+    print('✅ SciPy.spatial: stub installed (distance metrics).')
 
 print('✅ SciPy comprehensive stub fully loaded.')
 `;
