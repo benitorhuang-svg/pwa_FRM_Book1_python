@@ -67,43 +67,10 @@ len(plt.get_fignums())
       try {
         const plotData = await pyodide.runPythonAsync(`
 import matplotlib.pyplot as plt
-import io
-import base64
-
-def _sanitize_figure_text(fig):
-    import re as _re
-    _bs = chr(92)  # backslash, avoids escaping issues
-    for ax in fig.get_axes():
-        texts = [ax.title, ax.xaxis.label, ax.yaxis.label] + list(ax.texts)
-        legend = ax.get_legend()
-        if legend:
-            texts.extend(legend.get_texts())
-        for t in texts:
-            if not t:
-                continue
-            s = t.get_text()
-            if isinstance(s, str) and _bs in s:
-                s = _re.sub(r'\\\\+', _bs, s)
-                t.set_text(s)
-
-# 取得指定的圖表
+import io, base64
 fig = plt.figure(${i + 1})
-_sanitize_figure_text(fig)
 buf = io.BytesIO()
-try:
-    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-except Exception:
-    # Fallback with minimal rendering options if label parsing still fails.
-    import matplotlib as mpl
-    mpl.rcParams['text.usetex'] = False
-    mpl.rcParams['mathtext.default'] = 'regular'
-    _bs2 = chr(92)
-    for ax in fig.get_axes():
-        ax.set_xlabel(str(ax.get_xlabel()).replace(_bs2, ''))
-        ax.set_ylabel(str(ax.get_ylabel()).replace(_bs2, ''))
-        ax.set_title(str(ax.get_title()).replace(_bs2, ''))
-    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
-
+_safe_save_figure(fig, buf)
 buf.seek(0)
 base64.b64encode(buf.read()).decode('utf-8')
       `)
@@ -173,16 +140,52 @@ export async function initMatplotlib(pyodide, interactive = false) {
 import matplotlib
 import matplotlib.pyplot as plt
 import warnings
+import io
+import base64
+import re as _mpl_re
 matplotlib.use('${backend}')
 if plt.style.available and 'default' in plt.style.available:
     plt.style.use('default')
 
 warnings.filterwarnings("ignore", message=".*Matplotlib is currently using agg.*")
 if '${backend}' == 'AGG':
-    # In non-interactive mode, silence plt.show() side effects from source examples.
     def _silent_show(*args, **kwargs):
         return None
     plt.show = _silent_show
+
+# ── Pre-registered figure helpers (avoids backslash-in-template-literal issues) ──
+_BS = chr(92)  # single backslash character
+_MULTI_BS_RE = _mpl_re.compile(chr(92) + chr(92) + '+')  # regex: two-or-more backslashes
+
+def _sanitize_figure_text(fig):
+    """Replace sequences of multiple backslashes with a single one in all text artists."""
+    for ax in fig.get_axes():
+        texts = [ax.title, ax.xaxis.label, ax.yaxis.label] + list(ax.texts)
+        leg = ax.get_legend()
+        if leg:
+            texts.extend(leg.get_texts())
+        for t in texts:
+            if t is None:
+                continue
+            s = t.get_text()
+            if isinstance(s, str) and _BS in s:
+                s = _MULTI_BS_RE.sub(_BS, s)
+                t.set_text(s)
+
+def _safe_save_figure(fig, buf):
+    """Try to save fig; on failure, strip all backslashes from labels and retry."""
+    _sanitize_figure_text(fig)
+    try:
+        fig.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
+    except Exception:
+        import matplotlib as _mpl
+        _mpl.rcParams['text.usetex'] = False
+        _mpl.rcParams['mathtext.default'] = 'regular'
+        for ax in fig.get_axes():
+            ax.set_xlabel(str(ax.get_xlabel()).replace(_BS, ''))
+            ax.set_ylabel(str(ax.get_ylabel()).replace(_BS, ''))
+            ax.set_title(str(ax.get_title()).replace(_BS, ''))
+        fig.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
     `)
 
     // Matplotlib initialized successfully
