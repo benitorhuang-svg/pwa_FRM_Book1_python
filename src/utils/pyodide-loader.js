@@ -163,13 +163,36 @@ export async function loadPyodide(onProgress) {
             });
             await smoother.yieldToUI();
 
+            // Purge stale native scipy from IDBFS cache (causes PyInit__fblas crash)
+            try {
+                const spDirs = pyodide.FS.readdir(SITE_PACKAGES).filter(
+                    f => f.startsWith('scipy') || f.startsWith('statsmodels')
+                );
+                for (const d of spDirs) {
+                    try {
+                        const full = SITE_PACKAGES + '/' + d;
+                        const st = pyodide.FS.stat(full);
+                        if (pyodide.FS.isDir(st.mode)) {
+                            pyodide.FS.unmount && void 0; // no-op guard
+                            // rmdir tree via Python helper
+                            await pyodide.runPythonAsync(`import shutil; shutil.rmtree('${full}', ignore_errors=True)`);
+                        } else {
+                            pyodide.FS.unlink(full);
+                        }
+                    } catch (_e) { /* skip individual failures */ }
+                }
+                if (spDirs.length > 0) {
+                    console.log('Purged stale IDBFS entries:', spDirs.join(', '));
+                }
+            } catch (_e) { /* IDBFS readdir failure is non-fatal */ }
+
             // Check what's already installed to avoid redundant downloads
             // Core Pyodide distribution packages
             // NOTE: do not preload scipy here; browser-side SciPy native extensions can
             // trigger PyInit__fblas errors in this environment. We rely on SCIPY_STUB.
             const corePackages = ['numpy', 'pandas', 'matplotlib', 'sympy', 'lxml', 'micropip'];
             // Third-party packages (not in distribution)
-            const pipPackages = ['numpy-financial', 'pandas-datareader', 'pyodide-http', 'pymoo==0.4.1', 'seaborn'];
+            const pipPackages = ['setuptools', 'numpy-financial', 'pandas-datareader', 'pyodide-http', 'pymoo==0.4.1', 'seaborn'];
             const installedFiles = pyodide.FS.readdir(SITE_PACKAGES);
 
             const coreToLoad = corePackages.filter(pkg => {

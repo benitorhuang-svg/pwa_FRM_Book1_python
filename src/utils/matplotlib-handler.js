@@ -71,8 +71,8 @@ import io
 import base64
 
 def _sanitize_figure_text(fig):
-    # Make common book strings resilient in mathtext parser.
-    # Example failure seen in production: "\\\\mathit{x}_1"
+    import re as _re
+    _bs = chr(92)  # backslash, avoids escaping issues
     for ax in fig.get_axes():
         texts = [ax.title, ax.xaxis.label, ax.yaxis.label] + list(ax.texts)
         legend = ax.get_legend()
@@ -82,11 +82,8 @@ def _sanitize_figure_text(fig):
             if not t:
                 continue
             s = t.get_text()
-            if isinstance(s, str) and s.startswith('\\'):
-                # Keep math intent, but avoid invalid escaped prefix patterns.
-                s = s.replace('\\\\', '\\')
-                if s.startswith('\\') and not s.startswith('\\mathit{'):
-                    s = s.replace('\\', '')
+            if isinstance(s, str) and _bs in s:
+                s = _re.sub(r'\\\\+', _bs, s)
                 t.set_text(s)
 
 # 取得指定的圖表
@@ -100,10 +97,11 @@ except Exception:
     import matplotlib as mpl
     mpl.rcParams['text.usetex'] = False
     mpl.rcParams['mathtext.default'] = 'regular'
+    _bs2 = chr(92)
     for ax in fig.get_axes():
-        ax.set_xlabel(str(ax.get_xlabel()).replace('\\', ''))
-        ax.set_ylabel(str(ax.get_ylabel()).replace('\\', ''))
-        ax.set_title(str(ax.get_title()).replace('\\', ''))
+        ax.set_xlabel(str(ax.get_xlabel()).replace(_bs2, ''))
+        ax.set_ylabel(str(ax.get_ylabel()).replace(_bs2, ''))
+        ax.set_title(str(ax.get_title()).replace(_bs2, ''))
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='white')
 
 buf.seek(0)

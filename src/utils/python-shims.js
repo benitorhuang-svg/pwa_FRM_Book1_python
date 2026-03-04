@@ -1171,52 +1171,47 @@ try:
 except ImportError:
     pass
 
-# distutils 相容性 (Python 3.12 移除)
+# distutils 相容性 (Python 3.12 移除 distutils)
 import sys
-try:
-    import setuptools
-    import distutils
-except ImportError:
-    from types import ModuleType
-    d = ModuleType('distutils')
-    d.version = ModuleType('distutils.version')
-    d.util = ModuleType('distutils.util')
-    d.spawn = ModuleType('distutils.spawn')
-    sys.modules['distutils'] = d
-    sys.modules['distutils.version'] = d.version
-    sys.modules['distutils.util'] = d.util
-    sys.modules['distutils.spawn'] = d.spawn
+from types import ModuleType as _MT
+if 'distutils' not in sys.modules:
+    _d = _MT('distutils')
+    sys.modules['distutils'] = _d
+if 'distutils.version' not in sys.modules:
+    sys.modules['distutils.version'] = _MT('distutils.version')
+if 'distutils.util' not in sys.modules:
+    sys.modules['distutils.util'] = _MT('distutils.util')
+if 'distutils.spawn' not in sys.modules:
+    sys.modules['distutils.spawn'] = _MT('distutils.spawn')
 
-# Always ensure LooseVersion/StrictVersion exist (even if distutils loaded)
 import distutils.version as _dv
-if not hasattr(_dv, 'LooseVersion'):
-    import re as _re
-    class _LooseVersion:
-        component_re = _re.compile(r'(\\d+|[a-z]+|\\.|\\-)', _re.VERBOSE)
-        def __init__(self, vstring=None):
-            if vstring:
-                self.vstring = str(vstring)
-                self.version = [int(x) if x.isdigit() else x for x in self.component_re.findall(self.vstring) if x not in ('.', '-')]
-            else:
-                self.vstring = '0'
-                self.version = [0]
-        def __str__(self): return self.vstring
-        def __repr__(self): return 'LooseVersion(' + repr(self.vstring) + ')'
-        def _cmp(self, other):
-            if isinstance(other, str): other = _LooseVersion(other)
-            for a, b in zip(self.version, other.version):
-                if a == b: continue
-                try: return (int(a) > int(b)) - (int(a) < int(b))
-                except (ValueError, TypeError): return (str(a) > str(b)) - (str(a) < str(b))
-            return (len(self.version) > len(other.version)) - (len(self.version) < len(other.version))
-        def __eq__(self, o): return self._cmp(o) == 0
-        def __lt__(self, o): return self._cmp(o) < 0
-        def __le__(self, o): return self._cmp(o) <= 0
-        def __gt__(self, o): return self._cmp(o) > 0
-        def __ge__(self, o): return self._cmp(o) >= 0
-    _dv.LooseVersion = _LooseVersion
-    _dv.StrictVersion = _LooseVersion
-    print("✅ distutils.version.LooseVersion: 相容層已安裝。")
+import re as _re
+class _LooseVersion:
+    component_re = _re.compile(r'(\\d+|[a-z]+|\\.)', _re.VERBOSE)
+    def __init__(self, vstring=None):
+        if vstring:
+            self.vstring = str(vstring)
+            self.version = [int(x) if x.isdigit() else x for x in self.component_re.findall(self.vstring) if x != '.']
+        else:
+            self.vstring = '0'
+            self.version = [0]
+    def __str__(self): return self.vstring
+    def __repr__(self): return 'LooseVersion(' + repr(self.vstring) + ')'
+    def _cmp(self, other):
+        if isinstance(other, str): other = _LooseVersion(other)
+        for a, b in zip(self.version, other.version):
+            if a == b: continue
+            try: return (int(a) > int(b)) - (int(a) < int(b))
+            except (ValueError, TypeError): return (str(a) > str(b)) - (str(a) < str(b))
+        return (len(self.version) > len(other.version)) - (len(self.version) < len(other.version))
+    def __eq__(self, o): return self._cmp(o) == 0
+    def __lt__(self, o): return self._cmp(o) < 0
+    def __le__(self, o): return self._cmp(o) <= 0
+    def __gt__(self, o): return self._cmp(o) > 0
+    def __ge__(self, o): return self._cmp(o) >= 0
+_dv.LooseVersion = _LooseVersion
+_dv.StrictVersion = _LooseVersion
+print('✅ distutils.version.LooseVersion: 相容層已安裝。')
 
 # 網路支援
 try:
