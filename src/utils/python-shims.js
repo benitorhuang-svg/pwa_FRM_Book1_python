@@ -943,6 +943,16 @@ _stats.f = _make_gen(_FF, 'f')
 _stats.lognorm = _make_gen(_LognormF, 'lognorm')
 _stats.randint = _make_gen(_RandintF, 'randint')
 
+# add base classes so imports like 'from scipy.stats import rv_continuous' succeed
+class _RVContinuous:
+    def __init__(self, *args, **kw):
+        pass
+class _RVDiscrete:
+    def __init__(self, *args, **kw):
+        pass
+_stats.rv_continuous = _RVContinuous
+_stats.rv_discrete = _RVDiscrete
+
 # ── scipy.stats standalone functions ──────────────────────
 def _ttest_ind(a, b, equal_var=True, **kw):
     a = np.asarray(a, dtype=float); b = np.asarray(b, dtype=float)
@@ -1151,13 +1161,24 @@ except Exception:
             return float(r) if x_new.size == 1 else r
     class _Interp2d:
         def __init__(self, x, y, z, kind='linear', **kw):
+            # very lightweight bilinear-like stub: just nearest neighbor
             self._x = np.asarray(x, dtype=float)
             self._y = np.asarray(y, dtype=float)
             self._z = np.asarray(z, dtype=float)
+            # ensure z is 2D array with shape (len(y), len(x))
+            if self._z.ndim == 1:
+                self._z = self._z.reshape(len(y), -1)
         def __call__(self, xn, yn):
             xn = np.atleast_1d(np.asarray(xn, dtype=float))
             yn = np.atleast_1d(np.asarray(yn, dtype=float))
-            return np.interp(xn, self._x, self._z.flat[:len(self._x)])
+            # create output grid shape (len(yn), len(xn))
+            Xq, Yq = np.meshgrid(xn, yn)
+            # nearest-neighbor index along each axis
+            xi = np.searchsorted(self._x, Xq, side='right') - 1
+            yi = np.searchsorted(self._y, Yq, side='right') - 1
+            xi = np.clip(xi, 0, len(self._x) - 1)
+            yi = np.clip(yi, 0, len(self._y) - 1)
+            return self._z[yi, xi]
     _interp.interp1d = _Interp1d
     _interp.interp2d = _Interp2d
     _scipy_mod.interpolate = _interp
