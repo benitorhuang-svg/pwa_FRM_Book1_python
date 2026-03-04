@@ -348,3 +348,84 @@ import matplotlib.pyplot as plt
         // Silent fail for cleanup
     }
 }
+
+// ------------------------------------------------------------------
+// Additional utilities exported for App.jsx (background helpers)
+// ------------------------------------------------------------------
+
+// Keep track of which chapters we've already attempted to load
+const _loadedChapterDatasets = new Set();
+
+/**
+ * Ensure any auxiliary data files for a chapter are available in the
+ * Pyodide filesystem.  Currently this is a no-op stub; if a
+ * `public/data/datasets/{chapterId}.zip` file is ever added the logic
+ * below can be expanded to fetch & unpack it.
+ *
+ * @param {Object} pyodide - Pyodide instance
+ * @param {string} chapterId - e.g. "b1_ch3"
+ */
+export async function loadChapterDatasets(pyodide, chapterId) {
+    if (!pyodide || !chapterId) return;
+    if (_loadedChapterDatasets.has(chapterId)) return;
+
+    try {
+        // future work: download and extract dataset archive if present
+        const url = `${import.meta.env.BASE_URL}data/datasets/${chapterId}.zip`;
+        const resp = await fetch(url);
+        if (resp.ok) {
+            console.log(`found dataset archive for ${chapterId}`);
+            // attempt unzip if JSZip is available
+            if (window.JSZip) {
+                const buf = await resp.arrayBuffer();
+                const zip = await window.JSZip.loadAsync(buf);
+                await Promise.all(
+                    Object.keys(zip.files).map(async fname => {
+                        const data = await zip.files[fname].async('uint8array');
+                        pyodide.FS.writeFile(fname, data);
+                    })
+                );
+                console.log(`datasets for ${chapterId} extracted to FS`);
+            } else {
+                console.warn('JSZip not available, cannot unzip datasets');
+            }
+        }
+    } catch (e) {
+        console.warn('loadChapterDatasets error', e);
+    } finally {
+        _loadedChapterDatasets.add(chapterId);
+    }
+}
+
+/**
+ * Kick off background loading of large/optional Python packages so that
+ * the first user invocation doesn't incur a long network delay.  This is
+ * deliberately lightweight and tolerant of failure.
+ *
+ * @param {Object} pyodide - Pyodide instance
+ */
+export async function preloadHeavyPackages(pyodide) {
+    if (!pyodide) return;
+
+    try {
+        // ensure micropip is available for pip installs
+        await pyodide.loadPackage('micropip');
+        const micropip = pyodide.pyimport('micropip');
+
+        // list of wheel URLs or package names that tend to be large
+        const wheelUrls = [
+            `${import.meta.env.BASE_URL}wheels/pymoo-0.4.1-py3-none-any.whl`,
+            `${import.meta.env.BASE_URL}wheels/pandas_datareader-0.10.0-py3-none-any.whl`,
+            `${import.meta.env.BASE_URL}wheels/pyodide_http-0.2.2-py3-none-any.whl`,
+            `${import.meta.env.BASE_URL}wheels/seaborn-0.13.2-py3-none-any.whl`
+        ];
+
+        // Install them in the background; ignore failures
+        await micropip.install(wheelUrls, {transient: true}).catch(e => {
+            console.warn('preloadHeavyPackages pip install failed', e);
+        });
+    } catch (e) {
+        console.warn('preloadHeavyPackages error', e);
+    }
+}
+
