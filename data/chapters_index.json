@@ -1,0 +1,74 @@
+[
+  {
+    "id": "b1_ch1",
+    "title": "第1章：程式設計基礎",
+    "number": 1,
+    "file": "chapters_b1_ch1.json"
+  },
+  {
+    "id": "b1_ch2",
+    "title": "第2章：程式設計基礎 II",
+    "number": 2,
+    "file": "chapters_b1_ch2.json"
+  },
+  {
+    "id": "b1_ch3",
+    "title": "第3章：NumPy 使用",
+    "number": 3,
+    "file": "chapters_b1_ch3.json"
+  },
+  {
+    "id": "b1_ch4",
+    "title": "第4章：數學工具",
+    "number": 4,
+    "file": "chapters_b1_ch4.json"
+  },
+  {
+    "id": "b1_ch5",
+    "title": "第5章：Pandas 與資料分析 I",
+    "number": 5,
+    "file": "chapters_b1_ch5.json"
+  },
+  {
+    "id": "b1_ch6",
+    "title": "第6章：Pandas 與資料分析 II",
+    "number": 6,
+    "file": "chapters_b1_ch6.json"
+  },
+  {
+    "id": "b1_ch7",
+    "title": "第7章：資料視覺化",
+    "number": 7,
+    "file": "chapters_b1_ch7.json"
+  },
+  {
+    "id": "b1_ch8",
+    "title": "第8章：機率與統計 I",
+    "number": 8,
+    "file": "chapters_b1_ch8.json"
+  },
+  {
+    "id": "b1_ch9",
+    "title": "第9章：機率與統計 II",
+    "number": 9,
+    "file": "chapters_b1_ch9.json"
+  },
+  {
+    "id": "b1_ch10",
+    "title": "第10章：金融計算 I",
+    "number": 10,
+    "file": "chapters_b1_ch10.json"
+  },
+  {
+    "id": "b1_ch11",
+    "title": "第11章：金融計算 II",
+    "number": 11,
+    "file": "chapters_b1_ch11.json"
+  },
+  {
+    "id": "b1_ch12",
+    "title": "第12章：固定收益分析",
+    "number": 12,
+    "file": "chapters_b1_ch12.json"
+  }
+]
