@@ -649,12 +649,18 @@ except Exception:
 
 export const BASE_ENV_SETUP = `
 import warnings
+import logging
 # 忽略 DeprecationWarning 和 FutureWarning，保持 Console 乾淨
 warnings.simplefilter("ignore", DeprecationWarning)
 warnings.simplefilter("ignore", FutureWarning)
 warnings.simplefilter("ignore", SyntaxWarning)
 # 額外針對 pandas 的 pyarrow 警告進行過濾
 warnings.filterwarnings("ignore", message=".*pyarrow.*")
+warnings.filterwarnings("ignore", message=".*Matplotlib is currently using agg.*")
+
+# Reduce noisy Matplotlib font fallback logs in browser runtime
+logging.getLogger('matplotlib').setLevel(logging.ERROR)
+logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
 
 try:
     import matplotlib.pyplot as plt
@@ -669,6 +675,8 @@ try:
     matplotlib.use('Agg')
     import matplotlib as mpl
     mpl.rcParams['font.family'] = ['DejaVu Sans', 'sans-serif']
+    mpl.rcParams['mathtext.default'] = 'regular'
+    mpl.rcParams['text.usetex'] = False
 except Exception:
     pass
 
